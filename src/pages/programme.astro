@@ -1,0 +1,203 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ModuleCard from '../components/ModuleCard.astro';
+import EmailCapture from '../components/EmailCapture.astro';
+
+const modules = [
+  {
+    number: 1,
+    title: 'Skin cancer fundamentals',
+    subtitle: 'Why this matters for physios',
+    accentBg: '#EEEDFE',
+    accentText: '#3C3489',
+    dotColor: '#AFA9EC',
+    segments: [
+      { description: 'Nurse video: the three types — melanoma, BCC, SCC', duration: '3 min' },
+      { description: 'UK incidence stats and why early detection saves lives', duration: '2 min' },
+      { description: 'Image gallery: what each type looks like in practice', duration: '3 min' },
+      { description: 'Knowledge check: 5 multiple-choice questions', duration: '2 min' },
+    ],
+    learningOutcome:
+      'Identify the three main skin cancer types and explain why physios are uniquely positioned to spot early signs.',
+  },
+  {
+    number: 2,
+    title: 'Sport-specific risk zones',
+    subtitle: 'Where to look for runners, golfers and tennis players',
+    accentBg: '#E1F5EE',
+    accentText: '#085041',
+    dotColor: '#5DCAA5',
+    segments: [
+      { description: 'Nurse video: UV exposure patterns differ by sport', duration: '2 min' },
+      { description: 'Interactive body map: tap hotspots for each sport', duration: '3 min' },
+      { description: 'Case study: runner with suspicious lesion on calf', duration: '2 min' },
+      { description: 'Drag-and-drop exercise: match risk zones to sports', duration: '3 min' },
+    ],
+    learningOutcome:
+      'Map high-risk body areas for runners, golfers and tennis players based on typical clothing and UV exposure during play.',
+  },
+  {
+    number: 3,
+    title: 'Skin types and risk profiles',
+    subtitle: 'Fitzpatrick scale and inclusive clinical presentation',
+    accentBg: '#FAECE7',
+    accentText: '#712B13',
+    dotColor: '#F0997B',
+    segments: [
+      { description: 'Nurse video: Fitzpatrick types I–VI explained', duration: '2 min' },
+      {
+        description: 'Side-by-side image comparison: same lesion type across skin tones',
+        duration: '3 min',
+      },
+      {
+        description: 'Myth-busting: common misconceptions about darker skin and UV risk',
+        duration: '2 min',
+      },
+      {
+        description: 'Knowledge check: identify skin type and associated risk level',
+        duration: '3 min',
+      },
+    ],
+    learningOutcome:
+      'Assess a patient\'s Fitzpatrick skin type and recognise how skin cancer presents differently across the spectrum.',
+  },
+  {
+    number: 4,
+    title: 'The ABCDE check and red flags',
+    subtitle: 'A practical framework you can use in clinic',
+    accentBg: '#FAEEDA',
+    accentText: '#633806',
+    dotColor: '#EF9F27',
+    segments: [
+      {
+        description: 'Nurse video: walking through ABCDE on real clinical images',
+        duration: '3 min',
+      },
+      {
+        description: 'Interactive ABCDE tool: score a lesion image step by step',
+        duration: '3 min',
+      },
+      {
+        description: 'Scenario: patient mentions a mole has changed — what do you say?',
+        duration: '2 min',
+      },
+      { description: 'Red flags checklist: when to act urgently', duration: '2 min' },
+    ],
+    learningOutcome:
+      'Apply the ABCDE framework to assess a lesion and determine whether to recommend a professional skin check.',
+  },
+  {
+    number: 5,
+    title: 'Referral pathways and patient conversations',
+    subtitle: 'How to refer and what to say',
+    accentBg: '#E6F1FB',
+    accentText: '#0C447C',
+    dotColor: '#85B7EB',
+    segments: [
+      {
+        description:
+          'Nurse video: the Mole Clinic patient journey — what happens at a screening',
+        duration: '2 min',
+      },
+      {
+        description: 'Conversation scripts: three ways to raise a concern without causing panic',
+        duration: '3 min',
+      },
+      {
+        description:
+          'Clinic finder demo: how to locate the nearest Mole Clinic for your patient',
+        duration: '2 min',
+      },
+      {
+        description: 'Final assessment: 10 scenario-based questions across all modules',
+        duration: '3 min',
+      },
+    ],
+    learningOutcome:
+      'Confidently initiate a skin check conversation with a patient and refer them to the appropriate Mole Clinic location.',
+  },
+];
+---
+<Layout
+  title="Programme"
+  description="Five 10-minute modules covering skin cancer fundamentals, risk zones, skin types, the ABCDE framework, and referral pathways."
+>
+  <!-- Page header -->
+  <section class="bg-tmc-primary text-white">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-14">
+      <h1 class="text-3xl sm:text-4xl font-light text-white mb-3">The programme</h1>
+      <p class="text-tmc-light font-light text-lg max-w-xl">
+        Five modules, each 10 minutes. Self-paced. Certificate and digital badge on completion.
+      </p>
+    </div>
+  </section>
+
+  <!-- Summary bar -->
+  <section class="bg-tmc-light">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-5 flex flex-wrap gap-6 text-sm">
+      <div>
+        <span class="text-tmc-text/60">Total programme</span>
+        <span class="ml-2 font-medium text-tmc-text">50 mins</span>
+      </div>
+      <div>
+        <span class="text-tmc-text/60">CPD hours</span>
+        <span class="ml-2 font-medium text-tmc-text">1</span>
+      </div>
+      <div>
+        <span class="text-tmc-text/60">Format</span>
+        <span class="ml-2 font-medium text-tmc-text">Self-paced online</span>
+      </div>
+      <div>
+        <span class="text-tmc-text/60">Certificate</span>
+        <span class="ml-2 font-medium text-tmc-text">PDF + digital badge</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Module cards -->
+  <section class="py-12">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6">
+      <div class="flex flex-col gap-4">
+        {modules.map((mod) => <ModuleCard {...mod} />)}
+      </div>
+    </div>
+  </section>
+
+  <!-- Completion panel -->
+  <section class="py-8">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6">
+      <div class="border-2 border-tmc-mid rounded-2xl p-6 sm:p-8">
+        <h2 class="text-xl font-light text-tmc-primary mb-4">On completion</h2>
+        <dl class="grid sm:grid-cols-2 gap-3 text-sm">
+          <div class="flex gap-2">
+            <dt class="text-tmc-text/60 whitespace-nowrap">Pass mark:</dt>
+            <dd class="font-medium text-tmc-text">80% on final assessment (unlimited retakes)</dd>
+          </div>
+          <div class="flex gap-2">
+            <dt class="text-tmc-text/60 whitespace-nowrap">Certificate:</dt>
+            <dd class="font-medium text-tmc-text">Downloadable PDF with name, date and CPD hours</dd>
+          </div>
+          <div class="flex gap-2">
+            <dt class="text-tmc-text/60 whitespace-nowrap">Digital badge:</dt>
+            <dd class="font-medium text-tmc-text">Shareable to LinkedIn via Open Badges / Credly</dd>
+          </div>
+          <div class="flex gap-2">
+            <dt class="text-tmc-text/60 whitespace-nowrap">CPD hours:</dt>
+            <dd class="font-medium text-tmc-text">1 hour (aim for CSP-endorsed activity status)</dd>
+          </div>
+          <div class="flex gap-2">
+            <dt class="text-tmc-text/60 whitespace-nowrap">Renewal:</dt>
+            <dd class="font-medium text-tmc-text">Annual refresher module (5 min) to maintain active status</dd>
+          </div>
+        </dl>
+      </div>
+    </div>
+  </section>
+
+  <!-- Email capture -->
+  <section class="py-16">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6">
+      <EmailCapture heading="Be first to know when it launches" />
+    </div>
+  </section>
+</Layout>

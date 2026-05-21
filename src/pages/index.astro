@@ -1,0 +1,116 @@
+---
+import Layout from '../layouts/Layout.astro';
+import EmailCapture from '../components/EmailCapture.astro';
+
+const stats = [
+  { value: '1', label: 'CPD hour' },
+  { value: '5', label: 'modules × 10 min' },
+  { value: 'Self-paced', label: 'online' },
+  { value: 'Certificate', label: '+ digital badge' },
+];
+
+const reasons = [
+  {
+    heading: 'Hands-on access every session',
+    body: 'Physios examine skin during every treatment. That direct contact means you often see changes patients haven\'t noticed — and that your GP hasn\'t seen yet.',
+  },
+  {
+    heading: 'Trusted by patients',
+    body: 'Your patients see you regularly over weeks or months. That relationship means they\'re more likely to listen when you raise a concern about a mole or lesion.',
+  },
+  {
+    heading: 'Early detection saves lives',
+    body: 'Melanoma caught at stage 1 has a 98% survival rate. Caught at stage 4, it\'s under 20%. A timely referral from a physio can be the difference.',
+  },
+];
+
+const moduleTitles = [
+  'Skin cancer fundamentals',
+  'Sport-specific risk zones',
+  'Skin types and risk profiles',
+  'The ABCDE check and red flags',
+  'Referral pathways and patient conversations',
+];
+---
+<Layout title="Free Skin Cancer CPD for Physiotherapists">
+  <!-- Hero -->
+  <section class="bg-tmc-primary text-white">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-20 sm:py-28">
+      <div class="max-w-2xl">
+        <h1 class="text-4xl sm:text-5xl font-light text-white leading-tight mb-4">
+          Skin cancer CPD for physiotherapists
+        </h1>
+        <p class="text-xl text-tmc-light font-light mb-10 leading-relaxed">
+          A free 1-hour online programme. Spot the signs your patients can't.
+        </p>
+        <a
+          href="#waitlist"
+          class="inline-block bg-tmc-accent hover:bg-white hover:text-tmc-primary text-white font-medium px-8 py-3.5 rounded-lg transition-colors text-sm"
+        >
+          Join the waitlist
+        </a>
+      </div>
+
+      <!-- Stats row -->
+      <div class="mt-14 flex flex-wrap gap-x-8 gap-y-4">
+        {stats.map(({ value, label }) => (
+          <div class="border-l-2 border-tmc-mid pl-4">
+            <p class="text-lg font-medium text-white leading-tight">{value}</p>
+            <p class="text-sm text-tmc-light/80">{label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Why physios -->
+  <section class="py-16 sm:py-20">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6">
+      <h2 class="text-2xl sm:text-3xl font-light text-tmc-primary mb-10 text-center">
+        Why physiotherapists?
+      </h2>
+      <div class="grid sm:grid-cols-3 gap-8">
+        {reasons.map(({ heading, body }) => (
+          <div class="bg-tmc-surface rounded-2xl p-6">
+            <h3 class="text-base font-medium text-tmc-primary mb-2">{heading}</h3>
+            <p class="text-sm text-tmc-text leading-relaxed">{body}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- What you'll learn -->
+  <section class="py-12 bg-tmc-light">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6">
+      <h2 class="text-2xl sm:text-3xl font-light text-tmc-primary mb-8 text-center">
+        What you'll learn
+      </h2>
+      <ul class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 list-none p-0 m-0 mb-8">
+        {moduleTitles.map((title, i) => (
+          <li class="flex items-center gap-3 bg-white rounded-xl px-4 py-3">
+            <span class="w-6 h-6 rounded-full bg-tmc-primary text-white text-xs font-medium flex items-center justify-center flex-shrink-0">
+              {i + 1}
+            </span>
+            <span class="text-sm text-tmc-text font-medium">{title}</span>
+          </li>
+        ))}
+      </ul>
+      <div class="text-center">
+        <a
+          href="/programme"
+          class="text-sm text-tmc-primary hover:text-tmc-accent underline underline-offset-2 transition-colors"
+        >
+          See the full module breakdown →
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Email capture -->
+  <section id="waitlist" class="py-16 sm:py-20">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6">
+      <EmailCapture />
+    </div>
+  </section>
+</Layout>

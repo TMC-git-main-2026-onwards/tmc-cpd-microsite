@@ -1,0 +1,22 @@
+@import "tailwindcss";
+
+@theme {
+  --color-tmc-primary: #006F96;
+  --color-tmc-accent: #05B1C0;
+  --color-tmc-light: #D5EAED;
+  --color-tmc-mid: #91D1DC;
+  --color-tmc-text: #395171;
+  --color-tmc-surface: #F4F4F4;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  color: #395171;
+  background: #ffffff;
+  font-family: var(--font-sans);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  color: #006F96;
+  font-weight: 300;
+}

@@ -1,0 +1,71 @@
+---
+interface Props {
+  heading?: string;
+}
+const { heading = 'Join the waitlist' } = Astro.props;
+---
+<section class="bg-tmc-light rounded-2xl p-8 sm:p-10 max-w-xl mx-auto">
+  <h2 class="text-2xl font-light text-tmc-primary mb-2">{heading}</h2>
+  <p class="text-tmc-text text-sm mb-6">
+    We'll let you know the moment the programme is live.
+  </p>
+  <form
+    name="cpd-waitlist"
+    method="POST"
+    data-netlify="true"
+    netlify-honeypot="bot-field"
+    action="/thanks"
+    class="flex flex-col gap-4"
+  >
+    <input type="hidden" name="form-name" value="cpd-waitlist" />
+    <p class="hidden">
+      <label>Don't fill this out: <input name="bot-field" /></label>
+    </p>
+
+    <div class="flex flex-col gap-1">
+      <label for="email" class="text-sm font-medium text-tmc-text">Your email</label>
+      <input
+        id="email"
+        type="email"
+        name="email"
+        required
+        placeholder="you@clinic.co.uk"
+        class="border border-tmc-mid rounded-lg px-4 py-2.5 text-sm text-tmc-text placeholder-tmc-mid focus:outline-none focus:ring-2 focus:ring-tmc-accent bg-white"
+      />
+    </div>
+
+    <div class="flex flex-col gap-1">
+      <label for="profession" class="text-sm font-medium text-tmc-text">Profession</label>
+      <select
+        id="profession"
+        name="profession"
+        required
+        class="border border-tmc-mid rounded-lg px-4 py-2.5 text-sm text-tmc-text focus:outline-none focus:ring-2 focus:ring-tmc-accent bg-white"
+      >
+        <option value="">Select...</option>
+        <option>Physiotherapist</option>
+        <option>Sports therapist</option>
+        <option>Other healthcare professional</option>
+      </select>
+    </div>
+
+    <label class="flex items-start gap-3 cursor-pointer">
+      <input
+        type="checkbox"
+        name="consent"
+        required
+        class="mt-0.5 accent-tmc-accent flex-shrink-0"
+      />
+      <span class="text-sm text-tmc-text">
+        I'd like to be notified when the CPD programme launches.
+      </span>
+    </label>
+
+    <button
+      type="submit"
+      class="w-full bg-tmc-accent hover:bg-tmc-primary text-white font-medium py-3 px-6 rounded-lg transition-colors text-sm"
+    >
+      Join the waitlist
+    </button>
+  </form>
+</section>

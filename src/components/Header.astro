@@ -1,0 +1,36 @@
+---
+const navLinks = [
+  { href: '/', label: 'Home' },
+  { href: '/programme', label: 'Programme' },
+  { href: '/about', label: 'About' },
+];
+
+const currentPath = Astro.url.pathname;
+---
+<header class="bg-tmc-primary text-white">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+    <a href="/" class="flex-shrink-0" aria-label="The Mole Clinic CPD — home">
+      <img
+        src="/logo-white.png"
+        alt="The Mole Clinic"
+        class="h-9 w-auto"
+      />
+    </a>
+    <nav aria-label="Main navigation">
+      <ul class="flex gap-6 text-sm font-medium list-none m-0 p-0">
+        {navLinks.map(({ href, label }) => (
+          <li>
+            <a
+              href={href}
+              class={`hover:text-tmc-light transition-colors ${
+                currentPath === href ? 'border-b border-white pb-0.5' : 'opacity-90'
+              }`}
+            >
+              {label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  </div>
+</header>

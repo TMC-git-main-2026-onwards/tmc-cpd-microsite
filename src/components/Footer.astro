@@ -1,0 +1,22 @@
+---
+const year = new Date().getFullYear();
+---
+<!-- TODO: source dark-on-white logo for footer if needed; current uses text fallback -->
+<footer class="bg-tmc-primary text-white mt-auto">
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 py-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm">
+    <p class="opacity-80">© The Mole Clinic {year}</p>
+    <nav aria-label="Footer navigation">
+      <ul class="flex gap-6 list-none m-0 p-0 opacity-80">
+        <li><a href="/privacy" class="hover:opacity-100 transition-opacity">Privacy</a></li>
+        <li>
+          <a
+            href="https://themoleclinic.co.uk"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="hover:opacity-100 transition-opacity"
+          >themoleclinic.co.uk</a>
+        </li>
+      </ul>
+    </nav>
+  </div>
+</footer>
