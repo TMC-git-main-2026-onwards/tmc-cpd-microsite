@@ -1,0 +1,19 @@
+---
+export const prerender = false
+
+import { getServerClient } from '../../lib/supabase'
+
+const url = new URL(Astro.request.url)
+const code = url.searchParams.get('code')
+const next = url.searchParams.get('next') ?? '/dashboard'
+
+if (code) {
+  const supabase = getServerClient(Astro.request, Astro.cookies)
+  const { error } = await supabase.auth.exchangeCodeForSession(code)
+  if (!error) {
+    return Astro.redirect(next)
+  }
+}
+
+return Astro.redirect('/login?error=auth_error')
+---

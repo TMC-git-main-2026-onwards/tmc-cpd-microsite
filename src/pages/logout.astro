@@ -1,0 +1,10 @@
+---
+export const prerender = false
+
+import { getServerClient } from '../lib/supabase'
+
+const supabase = getServerClient(Astro.request, Astro.cookies)
+await supabase.auth.signOut()
+
+return Astro.redirect('/')
+---

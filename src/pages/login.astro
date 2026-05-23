@@ -1,0 +1,210 @@
+---
+export const prerender = false
+
+import Layout from '../layouts/Layout.astro'
+
+// Already logged in — send to dashboard
+if (Astro.locals.session) {
+  return Astro.redirect('/dashboard')
+}
+
+const errorMsg = new URL(Astro.request.url).searchParams.get('error')
+---
+<Layout title="Sign in" description="Sign in to access your TMC Skin Cancer CPD account.">
+  <section class="bg-tmc-primary text-white">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-14">
+      <h1 class="text-3xl sm:text-4xl font-light text-white mb-2">Sign in</h1>
+      <p class="text-tmc-light font-light">Access your CPD account.</p>
+    </div>
+  </section>
+
+  <section class="py-16">
+    <div class="max-w-md mx-auto px-4 sm:px-6">
+
+      {errorMsg && (
+        <div class="mb-6 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">
+          {errorMsg === 'auth_error'
+            ? 'The sign-in link has expired or is invalid. Please try again.'
+            : 'Something went wrong. Please try again.'}
+        </div>
+      )}
+
+      <!-- Tab switcher -->
+      <div class="flex rounded-lg border border-tmc-mid overflow-hidden mb-6 text-sm">
+        <button
+          id="tab-magic-btn"
+          class="flex-1 py-2.5 font-medium bg-tmc-primary text-white transition-colors"
+          data-tab="magic"
+        >
+          Magic link
+        </button>
+        <button
+          id="tab-password-btn"
+          class="flex-1 py-2.5 font-medium bg-white text-tmc-text hover:bg-tmc-surface transition-colors"
+          data-tab="password"
+        >
+          Password
+        </button>
+      </div>
+
+      <!-- Magic link form -->
+      <form id="magic-form" class="flex flex-col gap-4">
+        <p class="text-sm text-tmc-text/70">
+          Enter your email and we'll send you a one-click sign-in link.
+        </p>
+        <div class="flex flex-col gap-1">
+          <label for="magic-email" class="text-sm font-medium text-tmc-text">Email</label>
+          <input
+            id="magic-email"
+            type="email"
+            name="email"
+            required
+            placeholder="you@clinic.co.uk"
+            class="border border-tmc-mid rounded-lg px-4 py-2.5 text-sm text-tmc-text focus:outline-none focus:ring-2 focus:ring-tmc-accent"
+          />
+        </div>
+        <p id="magic-error" class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></p>
+        <p id="magic-success" class="hidden text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2"></p>
+        <button
+          type="submit"
+          id="magic-submit"
+          class="w-full bg-tmc-accent hover:bg-tmc-primary text-white font-medium py-3 rounded-lg transition-colors text-sm disabled:opacity-60"
+        >
+          Send magic link
+        </button>
+      </form>
+
+      <!-- Password form (hidden by default) -->
+      <form id="password-form" class="hidden flex-col gap-4">
+        <div class="flex flex-col gap-1">
+          <label for="pw-email" class="text-sm font-medium text-tmc-text">Email</label>
+          <input
+            id="pw-email"
+            type="email"
+            name="email"
+            required
+            placeholder="you@clinic.co.uk"
+            class="border border-tmc-mid rounded-lg px-4 py-2.5 text-sm text-tmc-text focus:outline-none focus:ring-2 focus:ring-tmc-accent"
+          />
+        </div>
+        <div class="flex flex-col gap-1">
+          <div class="flex items-center justify-between">
+            <label for="pw-password" class="text-sm font-medium text-tmc-text">Password</label>
+            <a href="/auth/reset-password" class="text-xs text-tmc-accent hover:text-tmc-primary underline underline-offset-2">
+              Forgot password?
+            </a>
+          </div>
+          <input
+            id="pw-password"
+            type="password"
+            name="password"
+            required
+            class="border border-tmc-mid rounded-lg px-4 py-2.5 text-sm text-tmc-text focus:outline-none focus:ring-2 focus:ring-tmc-accent"
+          />
+        </div>
+        <p id="pw-error" class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></p>
+        <button
+          type="submit"
+          id="pw-submit"
+          class="w-full bg-tmc-accent hover:bg-tmc-primary text-white font-medium py-3 rounded-lg transition-colors text-sm disabled:opacity-60"
+        >
+          Sign in
+        </button>
+      </form>
+
+      <p class="mt-6 text-center text-sm text-tmc-text/70">
+        Don't have an account?
+        <a href="/" class="text-tmc-accent hover:text-tmc-primary underline underline-offset-2 ml-1">
+          Sign up
+        </a>
+      </p>
+    </div>
+  </section>
+</Layout>
+
+<script>
+  import { getBrowserClient } from '../lib/supabase'
+
+  const supabase = getBrowserClient()
+
+  // --- Tab switching ---
+  const tabMagicBtn = document.getElementById('tab-magic-btn') as HTMLButtonElement
+  const tabPwBtn = document.getElementById('tab-password-btn') as HTMLButtonElement
+  const magicForm = document.getElementById('magic-form') as HTMLFormElement
+  const pwForm = document.getElementById('password-form') as HTMLFormElement
+
+  function activateTab(tab: 'magic' | 'password') {
+    const isMagic = tab === 'magic'
+    magicForm.classList.toggle('hidden', !isMagic)
+    magicForm.classList.toggle('flex', isMagic)
+    pwForm.classList.toggle('hidden', isMagic)
+    pwForm.classList.toggle('flex', !isMagic)
+    tabMagicBtn.classList.toggle('bg-tmc-primary', isMagic)
+    tabMagicBtn.classList.toggle('text-white', isMagic)
+    tabMagicBtn.classList.toggle('bg-white', !isMagic)
+    tabMagicBtn.classList.toggle('text-tmc-text', !isMagic)
+    tabPwBtn.classList.toggle('bg-tmc-primary', !isMagic)
+    tabPwBtn.classList.toggle('text-white', !isMagic)
+    tabPwBtn.classList.toggle('bg-white', isMagic)
+    tabPwBtn.classList.toggle('text-tmc-text', isMagic)
+  }
+
+  tabMagicBtn.addEventListener('click', () => activateTab('magic'))
+  tabPwBtn.addEventListener('click', () => activateTab('password'))
+
+  // --- Magic link form ---
+  const magicError = document.getElementById('magic-error') as HTMLElement
+  const magicSuccess = document.getElementById('magic-success') as HTMLElement
+  const magicSubmit = document.getElementById('magic-submit') as HTMLButtonElement
+
+  magicForm.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    magicError.classList.add('hidden')
+    magicSuccess.classList.add('hidden')
+    magicSubmit.disabled = true
+    magicSubmit.textContent = 'Sending…'
+
+    const email = (document.getElementById('magic-email') as HTMLInputElement).value.trim()
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+    })
+
+    magicSubmit.disabled = false
+    magicSubmit.textContent = 'Send magic link'
+
+    if (error) {
+      magicError.textContent = error.message
+      magicError.classList.remove('hidden')
+    } else {
+      magicSuccess.textContent = 'Check your email — a sign-in link is on its way.'
+      magicSuccess.classList.remove('hidden')
+    }
+  })
+
+  // --- Password form ---
+  const pwError = document.getElementById('pw-error') as HTMLElement
+  const pwSubmit = document.getElementById('pw-submit') as HTMLButtonElement
+
+  pwForm.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    pwError.classList.add('hidden')
+    pwSubmit.disabled = true
+    pwSubmit.textContent = 'Signing in…'
+
+    const email = (document.getElementById('pw-email') as HTMLInputElement).value.trim()
+    const password = (document.getElementById('pw-password') as HTMLInputElement).value
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+
+    pwSubmit.disabled = false
+    pwSubmit.textContent = 'Sign in'
+
+    if (error) {
+      pwError.textContent = error.message
+      pwError.classList.remove('hidden')
+    } else {
+      window.location.href = '/dashboard'
+    }
+  })
+</script>
