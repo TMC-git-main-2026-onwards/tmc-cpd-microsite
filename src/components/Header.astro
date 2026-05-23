@@ -3,21 +3,20 @@ const navLinks = [
   { href: '/', label: 'Home' },
   { href: '/programme', label: 'Programme' },
   { href: '/about', label: 'About' },
-];
+]
 
-const currentPath = Astro.url.pathname;
+const currentPath = Astro.url.pathname
+// session is null for pre-rendered static pages (middleware doesn't run on CDN-served files)
+const session = Astro.locals?.session ?? null
 ---
 <header class="bg-tmc-primary text-white">
   <div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
     <a href="/" class="flex-shrink-0" aria-label="The Mole Clinic CPD — home">
-      <img
-        src="/logo-white.png"
-        alt="The Mole Clinic"
-        class="h-9 w-auto"
-      />
+      <img src="/logo-white.png" alt="The Mole Clinic" class="h-9 w-auto" />
     </a>
+
     <nav aria-label="Main navigation">
-      <ul class="flex gap-6 text-sm font-medium list-none m-0 p-0">
+      <ul class="flex items-center gap-5 sm:gap-6 text-sm font-medium list-none m-0 p-0">
         {navLinks.map(({ href, label }) => (
           <li>
             <a
@@ -30,7 +29,69 @@ const currentPath = Astro.url.pathname;
             </a>
           </li>
         ))}
+
+        <!-- Auth nav: server renders based on Astro.locals (works on SSR pages).
+             Client script below syncs state on static pages. -->
+        <li>
+          <div
+            id="header-auth"
+            data-server-auth={session ? 'authenticated' : 'anonymous'}
+            class="flex items-center gap-4"
+          >
+            {session ? (
+              <>
+                <a
+                  href="/dashboard"
+                  data-auth-el="dashboard"
+                  class="opacity-90 hover:text-tmc-light transition-colors"
+                >
+                  Dashboard
+                </a>
+                <a
+                  href="/logout"
+                  data-auth-el="signout"
+                  class="opacity-90 hover:text-tmc-light transition-colors"
+                >
+                  Sign out
+                </a>
+              </>
+            ) : (
+              <a
+                href="/login"
+                data-auth-el="signin"
+                class="opacity-90 hover:text-tmc-light transition-colors"
+              >
+                Sign in
+              </a>
+            )}
+          </div>
+        </li>
       </ul>
     </nav>
   </div>
 </header>
+
+<script>
+  import { getBrowserClient } from '../lib/supabase'
+
+  ;(async () => {
+    const authDiv = document.getElementById('header-auth')
+    if (!authDiv) return
+
+    const serverState = authDiv.dataset.serverAuth // 'authenticated' | 'anonymous'
+
+    // If this is an SSR page and the server already set the correct state, skip.
+    // Only run the client check on static pages (serverState === 'anonymous' but
+    // the user might actually be logged in).
+    if (serverState === 'authenticated') return
+
+    const supabase = getBrowserClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return // server and client agree: anonymous
+
+    // Server said anonymous but client has a session — update the nav
+    authDiv.innerHTML =
+      `<a href="/dashboard" class="opacity-90 hover:text-tmc-light transition-colors">Dashboard</a>` +
+      `<a href="/logout" class="ml-4 opacity-90 hover:text-tmc-light transition-colors">Sign out</a>`
+  })()
+</script>
