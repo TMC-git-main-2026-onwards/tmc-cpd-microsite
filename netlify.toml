@@ -7,4 +7,4 @@
   # the private course-videos bucket. It is intentionally present in the server
   # function bundle, so exclude it from Netlify's secrets scanner to avoid a false
   # positive that would fail the build. It is never exposed to the client.
-  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_SERVICE_ROLE_KEY"
+  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_SERVICE_ROLE_KEY,RESEND_API_KEY,SEND_EMAIL_HOOK_SECRET"
