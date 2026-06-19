@@ -2,7 +2,7 @@
 export const prerender = false
 
 import Layout from '../layouts/Layout.astro'
-import { getServerClient } from '../lib/supabase'
+import { getServerClient, getAdminClient } from '../lib/supabase'
 
 // Validate session server-side with getUser() (re-validates JWT, not just cookie read)
 const supabase = getServerClient(Astro.request, Astro.cookies)
@@ -10,6 +10,20 @@ const { data: { user }, error: userError } = await supabase.auth.getUser()
 
 if (!user || userError) {
   return Astro.redirect('/login')
+}
+
+// Mint a short-lived signed URL for the gated Module 1 video. Only reached after
+// the auth check above, so anonymous visitors never get a link. The file lives in
+// the private `course-videos` bucket — there is no public path to it.
+const VIDEO_PATH = 'module-1-cpd-training.mp4'
+let moduleVideoUrl: string | null = null
+try {
+  const { data: signed } = await getAdminClient()
+    .storage.from('course-videos')
+    .createSignedUrl(VIDEO_PATH, 60 * 60) // 1 hour
+  moduleVideoUrl = signed?.signedUrl ?? null
+} catch (err) {
+  console.error('Failed to sign course video URL:', err)
 }
 
 // Fetch profile
@@ -54,7 +68,33 @@ const completedCount = modules.filter((m) => m.completed).length
     </div>
   </section>
 
+  <!-- Featured module video -->
   <section class="py-12">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6">
+      <h2 class="text-xl font-light text-tmc-primary mb-4">Module 1 — CPD Training</h2>
+      {moduleVideoUrl ? (
+        <div class="rounded-2xl overflow-hidden bg-black shadow-sm">
+          <video
+            controls
+            controlslist="nodownload"
+            preload="metadata"
+            class="w-full h-auto block aspect-video"
+          >
+            <source src={moduleVideoUrl} type="video/mp4" />
+            Your browser does not support the video tag.
+          </video>
+        </div>
+      ) : (
+        <div class="rounded-2xl bg-tmc-surface p-8 text-center">
+          <p class="text-sm text-tmc-text/70">
+            This video is temporarily unavailable. Please try again shortly.
+          </p>
+        </div>
+      )}
+    </div>
+  </section>
+
+  <section class="pb-12">
     <div class="max-w-5xl mx-auto px-4 sm:px-6">
 
       {modules.length === 0 ? (
