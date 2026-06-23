@@ -243,21 +243,21 @@ const allComplete = total > 0 && completedCount === total
     completedThisOpen = false
     titleEl.textContent = title
     statusEl.textContent = defaultStatus
-    video.muted = false
+    // Autoplay on pop-out with a single play() call (chaining a second play()
+    // off a rejected one races and fails). Browsers allow sound only during an
+    // active user gesture; if there isn't one, start MUTED (always permitted) so
+    // the video still plays, with the speaker control to add sound.
+    const hasGesture = !!(navigator.userActivation && navigator.userActivation.isActive)
+    video.muted = !hasGesture
     video.src = url
     modal.classList.remove('hidden')
     modal.classList.add('flex')
     document.body.style.overflow = 'hidden'
-    // Autoplay on pop-out. Browsers allow sound during the click gesture; if the
-    // gesture isn't strong enough (low media-engagement on a new domain), fall
-    // back to MUTED autoplay so the video still starts, and let the viewer turn
-    // sound on with the player's speaker control.
-    video.play().catch(() => {
-      video.muted = true
-      video.play()
-        .then(() => { statusEl.textContent = 'Playing muted — tap the speaker icon to turn sound on.' })
-        .catch(() => { statusEl.textContent = 'Press the ▶ play button to start the video.' })
-    })
+    video.play()
+      .then(() => {
+        if (video.muted) statusEl.textContent = 'Playing muted — tap the speaker icon to turn sound on.'
+      })
+      .catch(() => { statusEl.textContent = 'Press the ▶ play button to start the video.' })
   }
 
   function closeModal() {
