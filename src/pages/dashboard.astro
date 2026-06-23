@@ -217,6 +217,7 @@ const allComplete = total > 0 && completedCount === total
           controls
           controlslist="nodownload"
           playsinline
+          preload="metadata"
           class="w-full h-auto block aspect-video"
         ></video>
       </div>
@@ -241,10 +242,16 @@ const allComplete = total > 0 && completedCount === total
     titleEl.textContent = title
     statusEl.textContent = 'Watch to the end to mark this module complete.'
     video.src = url
+    video.load()
     modal.classList.remove('hidden')
     modal.classList.add('flex')
     document.body.style.overflow = 'hidden'
-    video.play().catch(() => {/* user can press play manually */})
+    // Attempt playback within the click gesture (where browsers allow it). If
+    // the browser still blocks autoplay, surface a clear prompt rather than a
+    // silent black frame — the native play button remains available.
+    video.play().catch(() => {
+      statusEl.textContent = 'Press the ▶ play button to start the video.'
+    })
   }
 
   function closeModal() {

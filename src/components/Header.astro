@@ -8,6 +8,10 @@ const navLinks = [
 const currentPath = Astro.url.pathname
 // session is null for pre-rendered static pages (middleware doesn't run on CDN-served files)
 const session = Astro.locals?.session ?? null
+// Once signed in, the dashboard replaces the public Programme page, so hide that
+// link. On SSR pages we filter here; on static pages the client script below
+// removes it when it detects a session.
+const visibleLinks = session ? navLinks.filter((l) => l.href !== '/programme') : navLinks
 ---
 <header class="bg-tmc-primary text-white">
   <div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
@@ -17,8 +21,8 @@ const session = Astro.locals?.session ?? null
 
     <nav aria-label="Main navigation">
       <ul class="flex items-center gap-5 sm:gap-6 text-sm font-medium list-none m-0 p-0">
-        {navLinks.map(({ href, label }) => (
-          <li>
+        {visibleLinks.map(({ href, label }) => (
+          <li data-nav={href}>
             <a
               href={href}
               class={`hover:text-tmc-light transition-colors ${
@@ -93,5 +97,8 @@ const session = Astro.locals?.session ?? null
     authDiv.innerHTML =
       `<a href="/dashboard" class="opacity-90 hover:text-tmc-light transition-colors">Dashboard</a>` +
       `<a href="/logout" class="ml-4 opacity-90 hover:text-tmc-light transition-colors">Sign out</a>`
+
+    // Signed in: hide the Programme link (the dashboard replaces it)
+    document.querySelector('[data-nav="/programme"]')?.remove()
   })()
 </script>
