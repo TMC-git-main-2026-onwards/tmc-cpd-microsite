@@ -236,21 +236,27 @@ const allComplete = total > 0 && completedCount === total
   let currentModuleId: string | null = null
   let completedThisOpen = false
 
+  const defaultStatus = 'Watch to the end to mark this module complete.'
+
   function openModal(url: string, moduleId: string, title: string) {
     currentModuleId = moduleId
     completedThisOpen = false
     titleEl.textContent = title
-    statusEl.textContent = 'Watch to the end to mark this module complete.'
+    statusEl.textContent = defaultStatus
+    video.muted = false
     video.src = url
-    video.load()
     modal.classList.remove('hidden')
     modal.classList.add('flex')
     document.body.style.overflow = 'hidden'
-    // Attempt playback within the click gesture (where browsers allow it). If
-    // the browser still blocks autoplay, surface a clear prompt rather than a
-    // silent black frame — the native play button remains available.
+    // Autoplay on pop-out. Browsers allow sound during the click gesture; if the
+    // gesture isn't strong enough (low media-engagement on a new domain), fall
+    // back to MUTED autoplay so the video still starts, and let the viewer turn
+    // sound on with the player's speaker control.
     video.play().catch(() => {
-      statusEl.textContent = 'Press the ▶ play button to start the video.'
+      video.muted = true
+      video.play()
+        .then(() => { statusEl.textContent = 'Playing muted — tap the speaker icon to turn sound on.' })
+        .catch(() => { statusEl.textContent = 'Press the ▶ play button to start the video.' })
     })
   }
 
