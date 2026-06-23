@@ -49,6 +49,7 @@ const moduleTitles = [
           A free 1-hour online programme. Spot the signs your patients can't.
         </p>
         <a
+          id="hero-cta"
           href="#waitlist"
           class="inline-block bg-tmc-accent hover:bg-white hover:text-tmc-primary text-white font-medium px-8 py-3.5 rounded-lg transition-colors text-sm"
         >
@@ -119,3 +120,16 @@ const moduleTitles = [
     </div>
   </section>
 </Layout>
+
+<script>
+  // When already signed in, the hero CTA points to the course instead of sign-up.
+  import { getBrowserClient } from '../lib/supabase'
+  ;(async () => {
+    const cta = document.getElementById('hero-cta')
+    if (!cta) return
+    const { data: { session } } = await getBrowserClient().auth.getSession()
+    if (!session) return
+    cta.textContent = 'Continue to your course →'
+    cta.setAttribute('href', '/dashboard')
+  })()
+</script>

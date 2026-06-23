@@ -5,6 +5,20 @@ interface Props {
 const { heading = 'Create your account' } = Astro.props;
 ---
 <section class="bg-tmc-light rounded-2xl p-8 sm:p-10 max-w-xl mx-auto">
+  <!-- Shown to already-signed-in users instead of the sign-up form, so they
+       can't accidentally create a second account. Toggled client-side below. -->
+  <div id="waitlist-signedin" class="hidden text-center">
+    <h2 class="text-2xl font-light text-tmc-primary mb-2">You're already signed in</h2>
+    <p class="text-tmc-text text-sm mb-6">Pick up your CPD where you left off.</p>
+    <a
+      href="/dashboard"
+      class="inline-block bg-tmc-accent hover:bg-tmc-primary text-white font-medium py-3 px-6 rounded-lg transition-colors text-sm"
+    >
+      Continue to your course →
+    </a>
+  </div>
+
+  <div id="waitlist-anon">
   <h2 class="text-2xl font-light text-tmc-primary mb-2">{heading}</h2>
   <p class="text-tmc-text text-sm mb-6">
     Join thousands of physios building their skin cancer confidence. Free, online, CPD-accredited.
@@ -77,6 +91,7 @@ const { heading = 'Create your account' } = Astro.props;
       Sign up
     </button>
   </form>
+  </div>
 </section>
 
 <script>
@@ -85,6 +100,15 @@ const { heading = 'Create your account' } = Astro.props;
   const form = document.getElementById('waitlist-form') as HTMLFormElement
   const submitBtn = document.getElementById('wl-submit') as HTMLButtonElement
   const errorEl = document.getElementById('wl-error') as HTMLParagraphElement
+
+  // Already signed in? Swap the sign-up form for a "continue" prompt so users
+  // don't create a duplicate account.
+  ;(async () => {
+    const { data: { session } } = await getBrowserClient().auth.getSession()
+    if (!session) return
+    document.getElementById('waitlist-anon')?.classList.add('hidden')
+    document.getElementById('waitlist-signedin')?.classList.remove('hidden')
+  })()
 
   function setLoading(loading: boolean) {
     submitBtn.disabled = loading
