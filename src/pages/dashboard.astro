@@ -12,20 +12,6 @@ if (!user || userError) {
   return Astro.redirect('/login')
 }
 
-// Mint a short-lived signed URL for the gated Module 1 video. Only reached after
-// the auth check above, so anonymous visitors never get a link. The file lives in
-// the private `course-videos` bucket — there is no public path to it.
-const VIDEO_PATH = 'module-1-cpd-training.mp4'
-let moduleVideoUrl: string | null = null
-try {
-  const { data: signed } = await getAdminClient()
-    .storage.from('course-videos')
-    .createSignedUrl(VIDEO_PATH, 60 * 60) // 1 hour
-  moduleVideoUrl = signed?.signedUrl ?? null
-} catch (err) {
-  console.error('Failed to sign course video URL:', err)
-}
-
 // Fetch profile
 const { data: profile } = await supabase
   .from('profiles')
@@ -36,7 +22,7 @@ const { data: profile } = await supabase
 // Fetch published modules
 const { data: modulesRaw } = await supabase
   .from('modules')
-  .select('id, slug, title, summary, order_index, duration_minutes')
+  .select('id, slug, title, summary, order_index, duration_minutes, video_url')
   .eq('published', true)
   .order('order_index')
 
@@ -48,14 +34,35 @@ const { data: completionsRaw } = await supabase
 
 const completedIds = new Set((completionsRaw ?? []).map((c) => c.module_id))
 
-const modules = (modulesRaw ?? []).map((m) => ({
-  ...m,
-  completed: completedIds.has(m.id),
-}))
+// Build view models with sequential gating + signed video URLs.
+// A module unlocks once the previous one is complete (the first is always open).
+// We only sign URLs for unlocked modules that actually have a video, so locked
+// content is never exposed to the client.
+const admin = getAdminClient()
+let prevCompleted = true
+const modules = []
+for (const m of modulesRaw ?? []) {
+  const completed = completedIds.has(m.id)
+  const unlocked = m.order_index === 1 || prevCompleted
+  let videoUrl: string | null = null
+  if (unlocked && m.video_url) {
+    try {
+      const { data: signed } = await admin
+        .storage.from('course-videos')
+        .createSignedUrl(m.video_url, 60 * 60) // 1 hour
+      videoUrl = signed?.signedUrl ?? null
+    } catch (err) {
+      console.error(`Failed to sign video for module ${m.slug}:`, err)
+    }
+  }
+  modules.push({ ...m, completed, unlocked, videoUrl })
+  prevCompleted = completed
+}
 
-const nextModule = modules.find((m) => !m.completed)
 const displayName = profile?.full_name || profile?.email || user.email
 const completedCount = modules.filter((m) => m.completed).length
+const total = modules.length
+const allComplete = total > 0 && completedCount === total
 ---
 <Layout title="Dashboard" description="Your TMC Skin Cancer CPD dashboard.">
   <section class="bg-tmc-primary text-white">
@@ -68,37 +75,10 @@ const completedCount = modules.filter((m) => m.completed).length
     </div>
   </section>
 
-  <!-- Featured module video -->
   <section class="py-12">
     <div class="max-w-5xl mx-auto px-4 sm:px-6">
-      <h2 class="text-xl font-light text-tmc-primary mb-4">Module 1 — CPD Training</h2>
-      {moduleVideoUrl ? (
-        <div class="rounded-2xl overflow-hidden bg-black shadow-sm">
-          <video
-            controls
-            controlslist="nodownload"
-            preload="metadata"
-            class="w-full h-auto block aspect-video"
-          >
-            <source src={moduleVideoUrl} type="video/mp4" />
-            Your browser does not support the video tag.
-          </video>
-        </div>
-      ) : (
-        <div class="rounded-2xl bg-tmc-surface p-8 text-center">
-          <p class="text-sm text-tmc-text/70">
-            This video is temporarily unavailable. Please try again shortly.
-          </p>
-        </div>
-      )}
-    </div>
-  </section>
 
-  <section class="pb-12">
-    <div class="max-w-5xl mx-auto px-4 sm:px-6">
-
-      {modules.length === 0 ? (
-        <!-- Modules not yet published -->
+      {total === 0 ? (
         <div class="bg-tmc-surface rounded-2xl p-8 text-center">
           <p class="text-tmc-text font-light text-lg mb-2">Programme coming soon</p>
           <p class="text-sm text-tmc-text/70">
@@ -110,20 +90,12 @@ const completedCount = modules.filter((m) => m.completed).length
           <!-- Progress summary -->
           <div class="flex items-center gap-6 mb-8">
             <div>
-              <p class="text-3xl font-light text-tmc-primary">{completedCount}/{modules.length}</p>
+              <p class="text-3xl font-light text-tmc-primary">{completedCount}/{total}</p>
               <p class="text-sm text-tmc-text/70">modules complete</p>
             </div>
-            {nextModule && (
-              <a
-                href={`/modules/${nextModule.slug}`}
-                class="ml-auto inline-block bg-tmc-accent hover:bg-tmc-primary text-white text-sm font-medium px-6 py-2.5 rounded-lg transition-colors"
-              >
-                Continue →
-              </a>
-            )}
-            {completedCount === modules.length && modules.length > 0 && (
+            {allComplete && (
               <p class="ml-auto text-sm font-medium text-green-700 bg-green-50 border border-green-200 px-4 py-2 rounded-lg">
-                Programme complete
+                Programme complete 🎉
               </p>
             )}
           </div>
@@ -131,44 +103,81 @@ const completedCount = modules.filter((m) => m.completed).length
           <!-- Module list -->
           <ul class="flex flex-col gap-3 list-none p-0 m-0">
             {modules.map((mod) => (
-              <li class={`flex items-center gap-4 rounded-xl border p-4 ${
+              <li class={`flex items-center gap-4 rounded-xl border p-4 transition-colors ${
                 mod.completed
                   ? 'border-green-200 bg-green-50'
-                  : 'border-gray-100 bg-white'
+                  : mod.unlocked
+                    ? 'border-gray-100 bg-white'
+                    : 'border-gray-100 bg-gray-50'
               }`}>
-                <div class={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0 ${
+                <!-- Status indicator: green tick when complete (not colour alone),
+                     number when available, lock when gated. -->
+                <div class={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
                   mod.completed
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-tmc-surface text-tmc-primary'
+                    ? 'bg-green-600 text-white'
+                    : mod.unlocked
+                      ? 'bg-tmc-surface text-tmc-primary'
+                      : 'bg-gray-100 text-gray-400'
                 }`}>
-                  {mod.order_index}
+                  {mod.completed ? (
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5" role="img" aria-label="Completed">
+                      <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.42 0l-3.5-3.5a1 1 0 011.42-1.42l2.79 2.79 6.79-6.79a1 1 0 011.42 0z" clip-rule="evenodd" />
+                    </svg>
+                  ) : mod.unlocked ? (
+                    <span class="text-sm font-medium">{mod.order_index}</span>
+                  ) : (
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4" role="img" aria-label="Locked">
+                      <path fill-rule="evenodd" d="M10 1a4 4 0 00-4 4v2H5a2 2 0 00-2 2v7a2 2 0 002 2h10a2 2 0 002-2V9a2 2 0 00-2-2h-1V5a4 4 0 00-4-4zm2 6V5a2 2 0 10-4 0v2h4z" clip-rule="evenodd" />
+                    </svg>
+                  )}
                 </div>
+
                 <div class="flex-1 min-w-0">
-                  <p class="font-medium text-tmc-text text-sm truncate">{mod.title}</p>
+                  <p class={`font-medium text-sm truncate ${mod.unlocked ? 'text-tmc-text' : 'text-gray-400'}`}>{mod.title}</p>
                   {mod.summary && (
                     <p class="text-xs text-tmc-text/60 truncate">{mod.summary}</p>
                   )}
                 </div>
-                {mod.duration_minutes && (
+
+                {mod.duration_minutes && mod.unlocked && (
                   <span class="text-xs text-tmc-text/50 flex-shrink-0">{mod.duration_minutes} min</span>
                 )}
-                <span class={`text-xs font-medium px-2.5 py-1 rounded-full flex-shrink-0 ${
-                  mod.completed
-                    ? 'bg-green-100 text-green-700'
-                    : 'bg-tmc-surface text-tmc-text/60'
-                }`}>
-                  {mod.completed ? 'Complete' : 'Not started'}
-                </span>
-                <!-- /modules/[slug] is week 2 — link stubs to coming-soon for now -->
-                <a
-                  href={`/modules/${mod.slug}`}
-                  class="text-xs text-tmc-accent hover:text-tmc-primary underline underline-offset-2 flex-shrink-0"
-                >
-                  {mod.completed ? 'Review' : 'Start'}
-                </a>
+
+                <!-- Action -->
+                {mod.completed && mod.videoUrl ? (
+                  <button
+                    type="button"
+                    class="watch-btn text-xs font-medium text-green-700 hover:text-green-800 underline underline-offset-2 flex-shrink-0"
+                    data-video-url={mod.videoUrl}
+                    data-module-id={mod.id}
+                    data-module-title={mod.title}
+                  >
+                    Rewatch
+                  </button>
+                ) : mod.completed ? (
+                  <span class="text-xs font-medium text-green-700 flex-shrink-0">Completed</span>
+                ) : mod.unlocked && mod.videoUrl ? (
+                  <button
+                    type="button"
+                    class="watch-btn bg-tmc-accent hover:bg-tmc-primary text-white text-xs font-medium px-4 py-2 rounded-lg transition-colors flex-shrink-0"
+                    data-video-url={mod.videoUrl}
+                    data-module-id={mod.id}
+                    data-module-title={mod.title}
+                  >
+                    ▶ Watch video
+                  </button>
+                ) : mod.unlocked ? (
+                  <span class="text-xs text-tmc-text/50 flex-shrink-0">Video coming soon</span>
+                ) : (
+                  <span class="text-xs text-gray-400 flex-shrink-0">Locked</span>
+                )}
               </li>
             ))}
           </ul>
+
+          <p class="text-xs text-tmc-text/50 mt-4">
+            Watch each video to the end to mark the module complete and unlock the next one.
+          </p>
         </>
       )}
 
@@ -183,4 +192,106 @@ const completedCount = modules.filter((m) => m.completed).length
       </div>
     </div>
   </section>
+
+  <!-- Video modal (pop-out) -->
+  <div
+    id="video-modal"
+    class="hidden fixed inset-0 z-50 items-center justify-center bg-black/70 p-4"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="video-modal-title"
+  >
+    <div class="bg-white rounded-2xl overflow-hidden w-full max-w-3xl shadow-xl">
+      <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+        <h3 id="video-modal-title" class="text-sm font-medium text-tmc-text truncate pr-4">Module video</h3>
+        <button
+          type="button"
+          id="video-modal-close"
+          class="text-tmc-text/50 hover:text-tmc-text text-2xl leading-none flex-shrink-0"
+          aria-label="Close video"
+        >&times;</button>
+      </div>
+      <div class="bg-black">
+        <video
+          id="modal-video"
+          controls
+          controlslist="nodownload"
+          playsinline
+          class="w-full h-auto block aspect-video"
+        ></video>
+      </div>
+      <p id="video-modal-status" class="text-xs text-tmc-text/60 px-5 py-3"></p>
+    </div>
+  </div>
 </Layout>
+
+<script>
+  const modal = document.getElementById('video-modal') as HTMLDivElement
+  const video = document.getElementById('modal-video') as HTMLVideoElement
+  const titleEl = document.getElementById('video-modal-title') as HTMLElement
+  const statusEl = document.getElementById('video-modal-status') as HTMLParagraphElement
+  const closeBtn = document.getElementById('video-modal-close') as HTMLButtonElement
+
+  let currentModuleId: string | null = null
+  let completedThisOpen = false
+
+  function openModal(url: string, moduleId: string, title: string) {
+    currentModuleId = moduleId
+    completedThisOpen = false
+    titleEl.textContent = title
+    statusEl.textContent = 'Watch to the end to mark this module complete.'
+    video.src = url
+    modal.classList.remove('hidden')
+    modal.classList.add('flex')
+    document.body.style.overflow = 'hidden'
+    video.play().catch(() => {/* user can press play manually */})
+  }
+
+  function closeModal() {
+    video.pause()
+    video.removeAttribute('src')
+    video.load()
+    modal.classList.add('hidden')
+    modal.classList.remove('flex')
+    document.body.style.overflow = ''
+    // If a module was completed during this view, refresh so the tick + unlock show.
+    if (completedThisOpen) window.location.reload()
+  }
+
+  document.querySelectorAll<HTMLButtonElement>('.watch-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      openModal(
+        btn.dataset.videoUrl!,
+        btn.dataset.moduleId!,
+        btn.dataset.moduleTitle ?? 'Module video',
+      )
+    })
+  })
+
+  // Mark complete when the video finishes.
+  video.addEventListener('ended', async () => {
+    if (!currentModuleId) return
+    statusEl.textContent = 'Saving your progress…'
+    try {
+      const res = await fetch('/api/complete-module', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ moduleId: currentModuleId }),
+      })
+      if (res.ok) {
+        completedThisOpen = true
+        statusEl.textContent = '✓ Module complete — the next one is now unlocked.'
+      } else {
+        statusEl.textContent = 'We couldn’t save your progress. Please try again.'
+      }
+    } catch {
+      statusEl.textContent = 'We couldn’t save your progress. Please try again.'
+    }
+  })
+
+  closeBtn.addEventListener('click', closeModal)
+  modal.addEventListener('click', (e) => { if (e.target === modal) closeModal() })
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal()
+  })
+</script>
