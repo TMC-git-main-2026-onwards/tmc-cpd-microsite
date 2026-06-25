@@ -5,7 +5,16 @@ import type { AstroCookies } from 'astro'
 const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL
 const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY
 
-export const getBrowserClient = () => createBrowserClient(supabaseUrl, supabaseAnonKey)
+// Use the implicit flow for the browser client. PKCE stores a per-browser
+// code-verifier and requires it back when the auth code is exchanged — which
+// breaks email links, since users open them in a different browser/app (phone
+// mail viewers, a fresh tab) where the verifier doesn't exist. Implicit puts
+// the session tokens in the redirect itself, so confirmation / magic-link
+// emails work from any device. The callback page persists the session.
+export const getBrowserClient = () =>
+  createBrowserClient(supabaseUrl, supabaseAnonKey, {
+    auth: { flowType: 'implicit', detectSessionInUrl: true },
+  })
 
 /**
  * Service-role client for privileged, server-only operations (e.g. signing

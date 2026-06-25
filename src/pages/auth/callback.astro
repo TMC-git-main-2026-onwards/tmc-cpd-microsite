@@ -5,15 +5,61 @@ import { getServerClient } from '../../lib/supabase'
 
 const url = new URL(Astro.request.url)
 const code = url.searchParams.get('code')
+const tokenHash = url.searchParams.get('token_hash')
+const type = url.searchParams.get('type')
 const next = url.searchParams.get('next') ?? '/dashboard'
 
+// Server-side handling for links that carry their token in the query string:
+//  - ?code=        PKCE auth code (same-browser flows)
+//  - ?token_hash=  one-time OTP hash (works from any browser)
 if (code) {
   const supabase = getServerClient(Astro.request, Astro.cookies)
   const { error } = await supabase.auth.exchangeCodeForSession(code)
-  if (!error) {
-    return Astro.redirect(next)
-  }
+  if (!error) return Astro.redirect(next)
+}
+if (tokenHash && type) {
+  const supabase = getServerClient(Astro.request, Astro.cookies)
+  const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type: type as any })
+  if (!error) return Astro.redirect(next)
 }
 
-return Astro.redirect('/login?error=auth_error')
+// Otherwise the tokens arrive in the URL hash (implicit flow), which the server
+// never sees — so finish sign-in on the client below.
 ---
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <title>Signing you in…</title>
+  </head>
+  <body style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#0e7490;display:flex;min-height:60vh;align-items:center;justify-content:center;">
+    <p>Signing you in…</p>
+    <script>
+      import { getBrowserClient } from '../../lib/supabase'
+
+      const params = new URLSearchParams(window.location.search)
+      const next = params.get('next') || '/dashboard'
+      const supabase = getBrowserClient()
+
+      ;(async () => {
+        // Creating the client with detectSessionInUrl parses #access_token /
+        // #refresh_token from the hash and persists the session to cookies.
+        let { data: { session } } = await supabase.auth.getSession()
+
+        // Fallback: set the session explicitly from the hash if needed.
+        if (!session && window.location.hash.includes('access_token')) {
+          const hash = new URLSearchParams(window.location.hash.slice(1))
+          const access_token = hash.get('access_token')
+          const refresh_token = hash.get('refresh_token')
+          if (access_token && refresh_token) {
+            const { data } = await supabase.auth.setSession({ access_token, refresh_token })
+            session = data.session
+          }
+        }
+
+        window.location.replace(session ? next : '/login?error=auth_error')
+      })()
+    </script>
+  </body>
+</html>
