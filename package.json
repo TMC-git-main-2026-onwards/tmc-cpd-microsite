@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@astrojs/netlify": "^7.0.10",
+    "@azure/storage-blob": "^12.33.0",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.1",
     "@tailwindcss/vite": "^4.3.0",

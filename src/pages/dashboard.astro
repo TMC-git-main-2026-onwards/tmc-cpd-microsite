@@ -2,7 +2,8 @@
 export const prerender = false
 
 import Layout from '../layouts/Layout.astro'
-import { getServerClient, getAdminClient } from '../lib/supabase'
+import { getServerClient } from '../lib/supabase'
+import { getVideoSasUrl } from '../lib/azure'
 
 // Validate session server-side with getUser() (re-validates JWT, not just cookie read)
 const supabase = getServerClient(Astro.request, Astro.cookies)
@@ -37,8 +38,8 @@ const completedIds = new Set((completionsRaw ?? []).map((c) => c.module_id))
 // Build view models with sequential gating + signed video URLs.
 // A module unlocks once the previous one is complete (the first is always open).
 // We only sign URLs for unlocked modules that actually have a video, so locked
-// content is never exposed to the client.
-const admin = getAdminClient()
+// content is never exposed to the client. Videos live in a private Azure Blob
+// container; we mint a short-lived SAS URL per unlocked module.
 let prevCompleted = true
 const modules = []
 for (const m of modulesRaw ?? []) {
@@ -47,10 +48,7 @@ for (const m of modulesRaw ?? []) {
   let videoUrl: string | null = null
   if (unlocked && m.video_url) {
     try {
-      const { data: signed } = await admin
-        .storage.from('course-videos')
-        .createSignedUrl(m.video_url, 60 * 60) // 1 hour
-      videoUrl = signed?.signedUrl ?? null
+      videoUrl = getVideoSasUrl(m.video_url, 60 * 60) // 1 hour
     } catch (err) {
       console.error(`Failed to sign video for module ${m.slug}:`, err)
     }

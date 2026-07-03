@@ -17,4 +17,8 @@ interface ImportMetaEnv {
   // Server-only — auth email hook (see src/pages/api/auth-email.ts).
   readonly RESEND_API_KEY: string
   readonly SEND_EMAIL_HOOK_SECRET: string
+  // Server-only — Azure Blob Storage for private course videos (see src/lib/azure.ts).
+  readonly AZURE_STORAGE_ACCOUNT: string
+  readonly AZURE_STORAGE_KEY: string
+  readonly AZURE_STORAGE_CONTAINER: string
 }
