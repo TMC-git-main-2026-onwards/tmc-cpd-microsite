@@ -43,12 +43,12 @@ if (tokenHash && type) {
       const supabase = getBrowserClient()
 
       ;(async () => {
-        // Creating the client with detectSessionInUrl parses #access_token /
-        // #refresh_token from the hash and persists the session to cookies.
-        let { data: { session } } = await supabase.auth.getSession()
+        let session = null
 
-        // Fallback: set the session explicitly from the hash if needed.
-        if (!session && window.location.hash.includes('access_token')) {
+        // A link carrying tokens in the hash always wins — even if a different
+        // account is already signed in on this device (e.g. clicking a magic
+        // link while logged in as someone else). Set it explicitly first.
+        if (window.location.hash.includes('access_token')) {
           const hash = new URLSearchParams(window.location.hash.slice(1))
           const access_token = hash.get('access_token')
           const refresh_token = hash.get('refresh_token')
@@ -56,6 +56,12 @@ if (tokenHash && type) {
             const { data } = await supabase.auth.setSession({ access_token, refresh_token })
             session = data.session
           }
+        }
+
+        // No hash tokens (already consumed by detectSessionInUrl, or none) —
+        // fall back to any existing session.
+        if (!session) {
+          ;({ data: { session } } = await supabase.auth.getSession())
         }
 
         window.location.replace(session ? next : '/login?error=auth_error')
