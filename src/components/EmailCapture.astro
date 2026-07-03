@@ -143,7 +143,7 @@ const { heading = 'Create your account' } = Astro.props;
     const redirectTo = `${window.location.origin}/auth/callback`
     const metadata = { profession, marketing_consent: true }
 
-    const { error } = password
+    const { data, error } = password
       ? await supabase.auth.signUp({
           email,
           password,
@@ -158,6 +158,14 @@ const { heading = 'Create your account' } = Astro.props;
 
     if (error) {
       showError(error.message)
+      return
+    }
+
+    // With email-enumeration protection on, signing up an already-registered
+    // address returns success with no email and an empty identities array.
+    // Don't strand the user on /thanks waiting for a link that never arrives.
+    if (password && data?.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+      showError('This email is already registered. Please sign in instead — or reset your password if you’ve forgotten it.')
       return
     }
 

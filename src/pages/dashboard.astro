@@ -48,7 +48,9 @@ for (const m of modulesRaw ?? []) {
   let videoUrl: string | null = null
   if (unlocked && m.video_url) {
     try {
-      videoUrl = getVideoSasUrl(m.video_url, 60 * 60) // 1 hour
+      // 8h TTL so a video left open (or a long session on the dashboard) doesn't
+      // hit an expired URL mid-watch. Still short-lived and read-only per blob.
+      videoUrl = getVideoSasUrl(m.video_url, 60 * 60 * 8)
     } catch (err) {
       console.error(`Failed to sign video for module ${m.slug}:`, err)
     }
@@ -221,7 +223,14 @@ const allComplete = total > 0 && completedCount === total
           class="w-full h-auto block aspect-video"
         ></video>
       </div>
-      <p id="video-modal-status" class="text-xs text-tmc-text/60 px-5 py-3"></p>
+      <div class="px-5 py-3 flex items-center gap-3">
+        <p id="video-modal-status" class="text-xs text-tmc-text/60 m-0"></p>
+        <button
+          type="button"
+          id="video-modal-retry"
+          class="hidden text-xs font-medium text-tmc-accent hover:text-tmc-primary underline underline-offset-2"
+        >Try again</button>
+      </div>
     </div>
   </div>
 </Layout>
@@ -232,9 +241,12 @@ const allComplete = total > 0 && completedCount === total
   const titleEl = document.getElementById('video-modal-title') as HTMLElement
   const statusEl = document.getElementById('video-modal-status') as HTMLParagraphElement
   const closeBtn = document.getElementById('video-modal-close') as HTMLButtonElement
+  const retryBtn = document.getElementById('video-modal-retry') as HTMLButtonElement
 
   let currentModuleId: string | null = null
   let completedThisOpen = false
+  let lastFocused: HTMLElement | null = null
+  let pendingSaveModuleId: string | null = null // set once ended fires, cleared on success
   // No skip-ahead: track the furthest point actually watched. Forward seeks past
   // this are snapped back; rewinding is fine. Freely seekable once completed.
   let maxWatched = 0
@@ -247,6 +259,8 @@ const allComplete = total > 0 && completedCount === total
     completedThisOpen = false
     maxWatched = 0
     allowSeek = completed
+    retryBtn.classList.add('hidden')
+    lastFocused = document.activeElement as HTMLElement
     titleEl.textContent = title
     statusEl.textContent = allowSeek ? '' : defaultStatus
     // Autoplay on pop-out with a single play() call (chaining a second play()
@@ -259,6 +273,7 @@ const allComplete = total > 0 && completedCount === total
     modal.classList.remove('hidden')
     modal.classList.add('flex')
     document.body.style.overflow = 'hidden'
+    closeBtn.focus() // move focus into the dialog for keyboard/screen-reader users
     video.play()
       .then(() => {
         if (video.muted) statusEl.textContent = 'Playing muted — tap the speaker icon to turn sound on.'
@@ -273,8 +288,25 @@ const allComplete = total > 0 && completedCount === total
     modal.classList.add('hidden')
     modal.classList.remove('flex')
     document.body.style.overflow = ''
+    lastFocused?.focus() // return focus to the control that opened the modal
     // If a module was completed during this view, refresh so the tick + unlock show.
     if (completedThisOpen) window.location.reload()
+  }
+
+  // Records completion. keepalive lets the request survive a tab close/navigation
+  // that happens right as the video ends. Returns true on success.
+  async function saveCompletion(moduleId: string): Promise<boolean> {
+    try {
+      const res = await fetch('/api/complete-module', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ moduleId }),
+        keepalive: true,
+      })
+      return res.ok
+    } catch {
+      return false
+    }
   }
 
   document.querySelectorAll<HTMLButtonElement>('.watch-btn').forEach((btn) => {
@@ -307,27 +339,49 @@ const allComplete = total > 0 && completedCount === total
   // Mark complete when the video finishes.
   video.addEventListener('ended', async () => {
     if (!currentModuleId) return
+    pendingSaveModuleId = currentModuleId
+    retryBtn.classList.add('hidden')
     statusEl.textContent = 'Saving your progress…'
-    try {
-      const res = await fetch('/api/complete-module', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ moduleId: currentModuleId }),
-      })
-      if (res.ok) {
-        completedThisOpen = true
-        statusEl.textContent = '✓ Module complete — the next one is now unlocked.'
-      } else {
-        statusEl.textContent = 'We couldn’t save your progress. Please try again.'
-      }
-    } catch {
-      statusEl.textContent = 'We couldn’t save your progress. Please try again.'
+    const ok = await saveCompletion(currentModuleId)
+    if (ok) {
+      pendingSaveModuleId = null
+      completedThisOpen = true
+      statusEl.textContent = '✓ Module complete — the next one is now unlocked.'
+    } else {
+      statusEl.textContent = 'We couldn’t save your progress.'
+      retryBtn.classList.remove('hidden')
     }
+  })
+
+  // Manual retry if the completion save failed.
+  retryBtn.addEventListener('click', async () => {
+    if (!pendingSaveModuleId) return
+    retryBtn.classList.add('hidden')
+    statusEl.textContent = 'Saving your progress…'
+    const ok = await saveCompletion(pendingSaveModuleId)
+    if (ok) {
+      pendingSaveModuleId = null
+      completedThisOpen = true
+      statusEl.textContent = '✓ Module complete — the next one is now unlocked.'
+    } else {
+      statusEl.textContent = 'Still couldn’t save. Check your connection and try again.'
+      retryBtn.classList.remove('hidden')
+    }
+  })
+
+  // Last-ditch save if the user closes the tab/navigates before the save landed.
+  window.addEventListener('pagehide', () => {
+    if (pendingSaveModuleId) saveCompletion(pendingSaveModuleId)
   })
 
   closeBtn.addEventListener('click', closeModal)
   modal.addEventListener('click', (e) => { if (e.target === modal) closeModal() })
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal()
+  })
+  // Focus trap: while the dialog is open, keep focus inside it.
+  document.addEventListener('focusin', (e) => {
+    if (modal.classList.contains('hidden')) return
+    if (!modal.contains(e.target as Node)) closeBtn.focus()
   })
 </script>

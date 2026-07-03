@@ -7,7 +7,14 @@ const url = new URL(Astro.request.url)
 const code = url.searchParams.get('code')
 const tokenHash = url.searchParams.get('token_hash')
 const type = url.searchParams.get('type')
-const next = url.searchParams.get('next') ?? '/dashboard'
+
+// Only allow same-site relative paths as the post-login destination, so a
+// crafted ?next=https://evil.example (or //evil.example, or javascript:...)
+// can't turn our trusted domain into an open-redirect / phishing bounce.
+function safeNext(raw: string | null): string {
+  return raw && /^\/(?!\/)/.test(raw) ? raw : '/dashboard'
+}
+const next = safeNext(url.searchParams.get('next'))
 
 // Server-side handling for links that carry their token in the query string:
 //  - ?code=        PKCE auth code (same-browser flows)
@@ -38,8 +45,9 @@ if (tokenHash && type) {
     <script>
       import { getBrowserClient } from '../../lib/supabase'
 
-      const params = new URLSearchParams(window.location.search)
-      const next = params.get('next') || '/dashboard'
+      const rawNext = new URLSearchParams(window.location.search).get('next')
+      // Same-site relative paths only (mirror of the server-side check).
+      const next = rawNext && /^\/(?!\/)/.test(rawNext) ? rawNext : '/dashboard'
       const supabase = getBrowserClient()
 
       ;(async () => {

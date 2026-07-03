@@ -3,8 +3,39 @@
   publish = "dist"
 
 [build.environment]
+  # Pin Node so a Netlify default-image bump can't silently change the runtime.
+  NODE_VERSION = "22"
   # SUPABASE_SERVICE_ROLE_KEY is used server-side (SSR dashboard) to sign URLs for
   # the private course-videos bucket. It is intentionally present in the server
   # function bundle, so exclude it from Netlify's secrets scanner to avoid a false
   # positive that would fail the build. It is never exposed to the client.
   SECRETS_SCAN_OMIT_KEYS = "SUPABASE_SERVICE_ROLE_KEY,RESEND_API_KEY,SEND_EMAIL_HOOK_SECRET,AZURE_STORAGE_KEY"
+
+# Security headers on every response. These are safe with the Supabase/Azure
+# integrations: auth + video calls are made from our own scripts to those hosts,
+# and we set no restrictive CSP (a tested CSP can be added later).
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    X-Frame-Options = "SAMEORIGIN"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), browsing-topics=()"
+    Cross-Origin-Opener-Policy = "same-origin"
+
+# Never cache authenticated / per-user responses in any shared cache.
+[[headers]]
+  for = "/dashboard"
+  [headers.values]
+    Cache-Control = "private, no-store"
+
+[[headers]]
+  for = "/auth/*"
+  [headers.values]
+    Cache-Control = "private, no-store"
+
+[[headers]]
+  for = "/api/*"
+  [headers.values]
+    Cache-Control = "private, no-store"

@@ -1,12 +1,17 @@
 # TMC CPD Microsite
 
-Marketing shopfront and waitlist capture for The Mole Clinic's free 1-hour skin cancer CPD programme for UK physiotherapists. Five static pages, no login, no course delivery — v1 only.
+The Mole Clinic's free 1-hour skin cancer CPD programme for UK physiotherapists:
+marketing pages plus a gated, account-based course with video modules, sequential
+unlocking, and completion tracking.
 
 ## Stack
 
-- [Astro 6](https://astro.build) (static, TypeScript strict)
+- [Astro 6](https://astro.build) — static marketing pages + SSR (on-demand) app pages via [`@astrojs/netlify`](https://docs.astro.build/en/guides/integrations-guide/netlify/)
 - [Tailwind CSS v4](https://tailwindcss.com)
-- [Netlify Forms](https://docs.netlify.com/forms/setup/) for waitlist capture
+- [Supabase](https://supabase.com) — auth (implicit flow, email confirmation + magic links) and Postgres with row-level security
+- [Resend](https://resend.com) — transactional auth emails (sender `wellbeing@cpd.themoleclinic.co.uk`)
+- [Azure Blob Storage](https://azure.microsoft.com/en-gb/products/storage/blobs) — private course videos, served via short-lived SAS URLs
+- [Netlify](https://netlify.com) — hosting/CDN, deployed from GitHub `main`
 
 ## Running locally
 
@@ -15,27 +20,42 @@ npm install
 npm run dev
 ```
 
-Then open [http://localhost:4321](http://localhost:4321).
+Then open [http://localhost:4321](http://localhost:4321). Copy `.env.example` to `.env`
+and fill in the values (see below).
 
-## Deploying to Netlify
+## Environment variables
 
-1. Push to GitHub (repo: `TMC-git-main-2026-onwards/tmc-cpd-microsite`)
-2. Connect the repo in the Netlify dashboard
-3. Build command: `npm run build`
-4. Publish directory: `dist`
-5. (Or just push — `netlify.toml` configures this automatically)
+See `.env.example`. Public (`PUBLIC_*`) values ship to the browser; the rest are
+server-only and must also be set in Netlify (Project configuration → Environment
+variables) for the deployed site:
 
-Custom domain: `cpd.themoleclinic.co.uk` (DNS CNAME to Netlify, configured in dashboard)
+- `PUBLIC_SUPABASE_URL`, `PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` — signs nothing client-side; server use only
+- `AZURE_STORAGE_ACCOUNT`, `AZURE_STORAGE_CONTAINER`, `AZURE_STORAGE_KEY` — video SAS
+- `RESEND_API_KEY`, `SEND_EMAIL_HOOK_SECRET` — only needed if the Supabase Send Email Hook is enabled
 
-## Pages
+## Deploying
+
+Push to `main` → Netlify builds (`npm run build`) and publishes `dist`. Config is in
+`netlify.toml` (build, Node version, security headers, secret-scan exemptions).
+
+Custom domain: `cpd.themoleclinic.co.uk`.
+
+## Key routes
 
 | Route | Purpose |
 |---|---|
-| `/` | Hero, why physios, module preview, waitlist form |
-| `/programme` | Full 5-module breakdown + completion details |
-| `/about` | TMC background and why this CPD exists |
-| `/privacy` | GDPR placeholder (needs legal review before launch) |
-| `/thanks` | Post-form confirmation, CTA to /programme |
+| `/` | Hero, why physios, module preview, sign-up |
+| `/programme`, `/about`, `/privacy`, `/thanks` | Static marketing/info pages |
+| `/login`, `/logout`, `/auth/*` | Authentication (SSR) |
+| `/dashboard` | Gated course: module list, video modal, progress (SSR) |
+| `/api/complete-module` | Records module completion (server-side gated) |
+| `/api/auth-email` | Supabase Send Email Hook endpoint (optional; off unless configured) |
+
+## Data model
+
+See `supabase/migrations/0001_initial_schema.sql` — `profiles`, `modules`,
+`module_completions`, with RLS policies and a trigger that creates a profile row on signup.
 
 ## Brand tokens
 

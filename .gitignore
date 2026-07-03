@@ -13,9 +13,10 @@ yarn-error.log*
 pnpm-debug.log*
 
 
-# environment variables
+# environment variables (Astro/Vite auto-loads all of these)
 .env
-.env.production
+.env.*
+!.env.example
 
 # macOS-specific files
 .DS_Store
