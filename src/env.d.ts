@@ -21,4 +21,10 @@ interface ImportMetaEnv {
   readonly AZURE_STORAGE_ACCOUNT: string
   readonly AZURE_STORAGE_KEY: string
   readonly AZURE_STORAGE_CONTAINER: string
+  // Server-only — Dynamics 365 / Dataverse contact sync (see src/lib/dataverse.ts).
+  readonly DATAVERSE_URL: string
+  readonly DATAVERSE_TENANT_ID: string
+  readonly DATAVERSE_CLIENT_ID: string
+  readonly DATAVERSE_CLIENT_SECRET: string
+  readonly DATAVERSE_WEBHOOK_SECRET: string
 }
