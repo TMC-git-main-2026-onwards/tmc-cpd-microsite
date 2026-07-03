@@ -149,6 +149,7 @@ const allComplete = total > 0 && completedCount === total
                     data-video-url={mod.videoUrl}
                     data-module-id={mod.id}
                     data-module-title={mod.title}
+                    data-completed="true"
                   >
                     Rewatch
                   </button>
@@ -161,6 +162,7 @@ const allComplete = total > 0 && completedCount === total
                     data-video-url={mod.videoUrl}
                     data-module-id={mod.id}
                     data-module-title={mod.title}
+                    data-completed="false"
                   >
                     ▶ Watch video
                   </button>
@@ -233,14 +235,20 @@ const allComplete = total > 0 && completedCount === total
 
   let currentModuleId: string | null = null
   let completedThisOpen = false
+  // No skip-ahead: track the furthest point actually watched. Forward seeks past
+  // this are snapped back; rewinding is fine. Freely seekable once completed.
+  let maxWatched = 0
+  let allowSeek = false
 
   const defaultStatus = 'Watch to the end to mark this module complete.'
 
-  function openModal(url: string, moduleId: string, title: string) {
+  function openModal(url: string, moduleId: string, title: string, completed: boolean) {
     currentModuleId = moduleId
     completedThisOpen = false
+    maxWatched = 0
+    allowSeek = completed
     titleEl.textContent = title
-    statusEl.textContent = defaultStatus
+    statusEl.textContent = allowSeek ? '' : defaultStatus
     // Autoplay on pop-out with a single play() call (chaining a second play()
     // off a rejected one races and fails). Browsers allow sound only during an
     // active user gesture; if there isn't one, start MUTED (always permitted) so
@@ -275,8 +283,25 @@ const allComplete = total > 0 && completedCount === total
         btn.dataset.videoUrl!,
         btn.dataset.moduleId!,
         btn.dataset.moduleTitle ?? 'Module video',
+        btn.dataset.completed === 'true',
       )
     })
+  })
+
+  // Advance the furthest-watched marker as the video plays normally.
+  video.addEventListener('timeupdate', () => {
+    if (!video.seeking && video.currentTime > maxWatched) {
+      maxWatched = video.currentTime
+    }
+  })
+
+  // Block seeking forward past what's been watched (first watch only).
+  video.addEventListener('seeking', () => {
+    if (allowSeek) return
+    if (video.currentTime > maxWatched + 1) {
+      video.currentTime = maxWatched
+      statusEl.textContent = 'You can’t skip ahead — please watch the video through.'
+    }
   })
 
   // Mark complete when the video finishes.
