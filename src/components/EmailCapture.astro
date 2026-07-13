@@ -96,6 +96,7 @@ const { heading = 'Create your account' } = Astro.props;
 
 <script>
   import { getBrowserClient } from '../lib/supabase'
+  import { friendlyAuthError } from '../lib/auth-errors'
 
   const form = document.getElementById('waitlist-form') as HTMLFormElement
   const submitBtn = document.getElementById('wl-submit') as HTMLButtonElement
@@ -157,7 +158,7 @@ const { heading = 'Create your account' } = Astro.props;
     setLoading(false)
 
     if (error) {
-      showError(error.message)
+      showError(friendlyAuthError(error))
       return
     }
 

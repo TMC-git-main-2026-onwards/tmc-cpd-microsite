@@ -124,6 +124,7 @@ const errorMsg = new URL(Astro.request.url).searchParams.get('error')
 
 <script>
   import { getBrowserClient } from '../lib/supabase'
+  import { friendlyAuthError } from '../lib/auth-errors'
 
   const supabase = getBrowserClient()
 
@@ -174,7 +175,7 @@ const errorMsg = new URL(Astro.request.url).searchParams.get('error')
     magicSubmit.textContent = 'Send magic link'
 
     if (error) {
-      magicError.textContent = error.message
+      magicError.textContent = friendlyAuthError(error)
       magicError.classList.remove('hidden')
     } else {
       magicSuccess.textContent = 'Check your email — a sign-in link is on its way.'
@@ -201,7 +202,7 @@ const errorMsg = new URL(Astro.request.url).searchParams.get('error')
     pwSubmit.textContent = 'Sign in'
 
     if (error) {
-      pwError.textContent = error.message
+      pwError.textContent = friendlyAuthError(error)
       pwError.classList.remove('hidden')
     } else {
       window.location.href = '/dashboard'
