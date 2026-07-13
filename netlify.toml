@@ -39,3 +39,17 @@
   for = "/api/*"
   [headers.values]
     Cache-Control = "private, no-store"
+
+# Privacy policy lives on the main site — redirect the microsite's /privacy there.
+# force = true so it applies even to bookmarks/SEO hits. 302 keeps it reversible.
+[[redirects]]
+  from = "/privacy"
+  to = "https://themoleclinic.co.uk/privacy/"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/privacy/"
+  to = "https://themoleclinic.co.uk/privacy/"
+  status = 302
+  force = true
