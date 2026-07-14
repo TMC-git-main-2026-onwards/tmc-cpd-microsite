@@ -1,0 +1,101 @@
+---
+export const prerender = false
+
+import Layout from '../layouts/Layout.astro'
+import { getServerClient } from '../lib/supabase'
+
+// Gated: signed in + all modules complete + final assessment passed.
+const supabase = getServerClient(Astro.request, Astro.cookies)
+const { data: { user }, error: userError } = await supabase.auth.getUser()
+if (!user || userError) return Astro.redirect('/login')
+
+const PASS_PERCENT = 80
+const [{ data: profile }, { data: modules }, { data: comps }] = await Promise.all([
+  supabase.from('profiles').select('full_name, email, profession').eq('id', user.id).single(),
+  supabase.from('modules').select('id').eq('published', true),
+  supabase.from('module_completions').select('module_id, quiz_score, completed_at').eq('user_id', user.id),
+])
+
+const done = new Set((comps ?? []).map((c) => c.module_id))
+const allComplete = (modules ?? []).length > 0 && (modules ?? []).every((m) => done.has(m.id))
+const passRow = (comps ?? []).find((c) => (c.quiz_score ?? 0) >= PASS_PERCENT)
+if (!allComplete || !passRow) return Astro.redirect('/quiz')
+
+const displayName = profile?.full_name || profile?.email || user.email
+const score = passRow.quiz_score
+const completedDate = new Date(passRow.completed_at ?? Date.now()).toLocaleDateString('en-GB', {
+  day: 'numeric', month: 'long', year: 'numeric',
+})
+---
+<Layout title="Your CPD asset pack" description="Your Mole Clinic Skin Cancer CPD completion assets.">
+  <section class="bg-tmc-primary text-white">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 py-10">
+      <p class="text-tmc-light/80 text-sm mb-1">Congratulations, {displayName}</p>
+      <h1 class="text-2xl sm:text-3xl font-light text-white">Your digital asset pack</h1>
+      <p class="text-tmc-light/90 text-sm mt-2">
+        You've completed all five modules and passed the assessment ({score}%). Here's your pack.
+      </p>
+    </div>
+  </section>
+
+  <section class="py-10">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6">
+
+      <!-- Printable CPD completion record -->
+      <div id="record" class="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 mb-6">
+        <div class="flex items-start justify-between gap-4 mb-5">
+          <div>
+            <div class="text-tmc-primary text-sm tracking-wide mb-1">The MOLE Clinic</div>
+            <h2 class="text-xl font-light text-tmc-primary">CPD Completion Record</h2>
+          </div>
+          <button id="printBtn" class="no-print bg-tmc-accent hover:bg-tmc-primary text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors flex-shrink-0">
+            Print / save as PDF
+          </button>
+        </div>
+        <dl class="grid sm:grid-cols-2 gap-x-8 gap-y-4 text-sm">
+          <div><dt class="text-tmc-text/60">Name</dt><dd class="text-tmc-text font-medium">{displayName}</dd></div>
+          {profile?.profession && (
+            <div><dt class="text-tmc-text/60">Profession</dt><dd class="text-tmc-text font-medium">{profile.profession}</dd></div>
+          )}
+          <div><dt class="text-tmc-text/60">Programme</dt><dd class="text-tmc-text font-medium">Skin Cancer Awareness for Physiotherapists</dd></div>
+          <div><dt class="text-tmc-text/60">CPD hours</dt><dd class="text-tmc-text font-medium">1 hour</dd></div>
+          <div><dt class="text-tmc-text/60">Assessment score</dt><dd class="text-tmc-text font-medium">{score}%</dd></div>
+          <div><dt class="text-tmc-text/60">Date completed</dt><dd class="text-tmc-text font-medium">{completedDate}</dd></div>
+        </dl>
+        <p class="text-xs text-tmc-text/50 mt-6 pt-5 border-t border-gray-100">
+          The Mole Clinic · CPD Programme v1.0 · Retain this record as evidence of your continuing professional development.
+        </p>
+      </div>
+
+      <!-- Asset list -->
+      <div class="grid sm:grid-cols-2 gap-4 no-print">
+        <div class="bg-tmc-surface rounded-2xl p-6">
+          <h3 class="text-base font-medium text-tmc-primary mb-1">CPD Certificate</h3>
+          <p class="text-sm text-tmc-text/70">Your formal certificate is being finalised — we'll email it to <b>{profile?.email || user.email}</b> shortly.</p>
+          <span class="inline-block mt-3 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">Coming soon</span>
+        </div>
+        <div class="bg-tmc-surface rounded-2xl p-6">
+          <h3 class="text-base font-medium text-tmc-primary mb-1">Digital badge</h3>
+          <p class="text-sm text-tmc-text/70">A shareable badge for your profile and email signature — arriving with your certificate.</p>
+          <span class="inline-block mt-3 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">Coming soon</span>
+        </div>
+      </div>
+
+      <p class="mt-8">
+        <a href="/dashboard" class="text-sm text-tmc-text/60 hover:text-tmc-text underline underline-offset-2">← Back to your dashboard</a>
+      </p>
+    </div>
+  </section>
+</Layout>
+
+<style is:global>
+  @media print {
+    .no-print { display: none !important; }
+    header, footer { display: none !important; }
+    body { background: #fff !important; }
+  }
+</style>
+
+<script>
+  document.getElementById('printBtn')?.addEventListener('click', () => window.print())
+</script>

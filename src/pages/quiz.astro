@@ -1,0 +1,206 @@
+---
+export const prerender = false
+
+import Layout from '../layouts/Layout.astro'
+import { getServerClient } from '../lib/supabase'
+import { QUESTIONS, PASS_PERCENT } from '../lib/quiz'
+
+// Gated: signed in + every published module complete. The pass itself is
+// decided server-side in /api/complete-quiz; this page is the exam room.
+const supabase = getServerClient(Astro.request, Astro.cookies)
+const { data: { user }, error: userError } = await supabase.auth.getUser()
+if (!user || userError) return Astro.redirect('/login')
+
+const [{ data: modules }, { data: comps }] = await Promise.all([
+  supabase.from('modules').select('id').eq('published', true),
+  supabase.from('module_completions').select('module_id, quiz_score').eq('user_id', user.id),
+])
+const done = new Set((comps ?? []).map((c) => c.module_id))
+const allComplete = (modules ?? []).length > 0 && (modules ?? []).every((m) => done.has(m.id))
+if (!allComplete) return Astro.redirect('/dashboard')
+
+const alreadyPassed = (comps ?? []).some((c) => (c.quiz_score ?? 0) >= PASS_PERCENT)
+if (alreadyPassed) return Astro.redirect('/dashboard')
+
+// Questions (with answers/explanations) power the interactive experience;
+// the authoritative pass decision happens server-side on submission.
+const questionsJson = JSON.stringify(QUESTIONS)
+---
+<Layout title="Final assessment" description="The Mole Clinic Skin Cancer CPD final assessment.">
+  <section class="bg-tmc-primary text-white">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 py-10">
+      <h1 class="text-2xl sm:text-3xl font-light text-white mb-2">Skin Cancer Awareness — CPD Assessment</h1>
+      <p class="text-tmc-light/90 text-sm">
+        {QUESTIONS.length} questions across all five modules. Pass mark {PASS_PERCENT}%.
+        There's no time limit, and you can retake it if you need to.
+      </p>
+    </div>
+  </section>
+
+  <section class="py-10">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6">
+
+      <!-- Progress -->
+      <div id="pbar" class="flex items-center gap-4 bg-white border border-gray-200 rounded-xl px-5 py-3.5 mb-5 text-sm">
+        <span id="count" class="text-tmc-primary font-medium whitespace-nowrap">Question 1 of {QUESTIONS.length}</span>
+        <div class="flex-1 h-2 bg-tmc-light rounded-full overflow-hidden">
+          <div id="fill" class="h-full w-0 bg-tmc-accent transition-all"></div>
+        </div>
+      </div>
+
+      <div id="quizArea"></div>
+
+      <!-- Results -->
+      <div id="results" class="hidden text-center">
+        <div id="scorecircle" class="w-36 h-36 rounded-full mx-auto mb-5 flex flex-col items-center justify-center text-white">
+          <div id="finalScore" class="text-4xl font-bold leading-none">0</div>
+          <div class="text-sm opacity-90 mt-1">out of {QUESTIONS.length}</div>
+        </div>
+        <p id="verdict" class="text-xl text-tmc-text font-normal mb-2"></p>
+        <p id="verdictsub" class="text-sm text-tmc-text/70 mb-6 max-w-md mx-auto"></p>
+        <div class="flex justify-center gap-3 mb-8">
+          <a id="packBtn" href="/dashboard" class="hidden bg-tmc-accent hover:bg-tmc-primary text-white text-sm font-medium px-6 py-2.5 rounded-lg transition-colors">Collect your asset pack →</a>
+          <button id="retakeBtn" class="hidden bg-white border border-gray-300 hover:bg-tmc-light text-tmc-primary text-sm font-medium px-6 py-2.5 rounded-lg transition-colors">Retake the assessment</button>
+        </div>
+        <div class="text-left">
+          <h3 class="text-lg font-light text-tmc-primary mb-3">Answer review</h3>
+          <div id="reviewList" class="flex flex-col gap-2"></div>
+        </div>
+      </div>
+
+      <p class="mt-8 text-center">
+        <a href="/dashboard" class="text-sm text-tmc-text/60 hover:text-tmc-text underline underline-offset-2">← Back to your dashboard</a>
+      </p>
+    </div>
+  </section>
+</Layout>
+
+<script is:inline define:vars={{ questionsJson }}>
+  const QUESTIONS = JSON.parse(questionsJson)
+  const letters = ['A', 'B', 'C', 'D']
+  let current = 0
+  let answered = QUESTIONS.map(() => false)
+  let selected = QUESTIONS.map(() => null)
+
+  const area = document.getElementById('quizArea')
+
+  function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML }
+
+  function render() {
+    const Q = QUESTIONS[current]
+    document.getElementById('count').textContent = `Question ${current + 1} of ${QUESTIONS.length}`
+    document.getElementById('fill').style.width = `${(current / QUESTIONS.length) * 100}%`
+
+    const opts = Q.opts.map((o, i) => {
+      let cls = 'flex gap-3 items-start border rounded-lg px-4 py-3 text-sm text-left w-full transition-colors '
+      let badge = 'bg-tmc-light text-tmc-primary'
+      if (answered[current]) {
+        cls += 'cursor-default '
+        if (i === Q.a) { cls += 'border-green-500 bg-green-50'; badge = 'bg-green-600 text-white' }
+        else if (i === selected[current]) { cls += 'border-red-400 bg-red-50'; badge = 'bg-red-500 text-white' }
+        else { cls += 'border-gray-200 opacity-60' }
+      } else {
+        cls += 'cursor-pointer border-gray-200 bg-white hover:border-tmc-accent'
+      }
+      return `<button type="button" data-i="${i}" class="opt ${cls}" ${answered[current] ? 'disabled' : ''}>
+        <span class="flex-none w-6 h-6 rounded-full ${badge} font-semibold text-xs flex items-center justify-center mt-0.5">${letters[i]}</span>
+        <span>${esc(o)}</span></button>`
+    }).join('')
+
+    const fb = answered[current]
+      ? `<div class="mt-4 rounded-lg px-4 py-3 text-sm bg-tmc-light border-l-4 border-tmc-accent">
+           <b class="text-tmc-primary">${selected[current] === Q.a ? 'Correct.' : 'Not quite.'}</b> ${esc(Q.e)}</div>`
+      : ''
+
+    const isLast = current === QUESTIONS.length - 1
+    area.innerHTML = `
+      <div class="bg-white border border-gray-200 rounded-xl p-6">
+        <span class="inline-block bg-tmc-light text-tmc-primary text-xs font-medium tracking-wide uppercase px-2.5 py-1 rounded-md mb-4">${esc(Q.m)}</span>
+        <p class="text-lg text-tmc-text font-normal mb-5">${esc(Q.q)}</p>
+        <div class="flex flex-col gap-2.5">${opts}</div>
+        ${fb}
+        <div class="flex justify-between items-center mt-6 gap-3">
+          <button id="prevBtn" class="bg-white border border-gray-300 text-tmc-primary text-sm font-medium px-5 py-2.5 rounded-lg disabled:opacity-40" ${current === 0 ? 'disabled' : ''}>Back</button>
+          <button id="nextBtn" class="bg-tmc-primary hover:bg-tmc-accent text-white text-sm font-medium px-6 py-2.5 rounded-lg disabled:opacity-40" ${answered[current] ? '' : 'disabled'}>${isLast ? 'See results' : 'Next question'}</button>
+        </div>
+      </div>`
+
+    area.querySelectorAll('.opt').forEach((b) => b.addEventListener('click', () => choose(Number(b.dataset.i))))
+    document.getElementById('prevBtn').addEventListener('click', () => { if (current > 0) { current--; render() } })
+    document.getElementById('nextBtn').addEventListener('click', () => {
+      if (current < QUESTIONS.length - 1) { current++; render() } else showResults()
+    })
+  }
+
+  function choose(i) {
+    if (answered[current]) return
+    answered[current] = true
+    selected[current] = i
+    render()
+  }
+
+  async function showResults() {
+    // Server is the authority: it scores the submission and records a pass.
+    let server = null
+    try {
+      const res = await fetch('/api/complete-quiz', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answers: selected }),
+      })
+      if (res.ok) server = await res.json()
+    } catch { /* fall through to local display */ }
+
+    const score = server?.score ?? QUESTIONS.reduce((n, q, i) => n + (selected[i] === q.a ? 1 : 0), 0)
+    const passed = server ? server.passed : false
+    const saveFailed = !server
+
+    area.style.display = 'none'
+    document.getElementById('pbar').style.display = 'none'
+    const r = document.getElementById('results')
+    r.classList.remove('hidden')
+    document.getElementById('finalScore').textContent = score
+
+    const circle = document.getElementById('scorecircle')
+    const verdict = document.getElementById('verdict')
+    const sub = document.getElementById('verdictsub')
+    if (saveFailed) {
+      circle.style.background = '#fac613'
+      verdict.textContent = 'We couldn’t save your result'
+      sub.textContent = 'Check your connection and retake the assessment — your answers weren’t recorded.'
+      document.getElementById('retakeBtn').classList.remove('hidden')
+    } else if (passed) {
+      circle.style.background = '#33ad6b'
+      verdict.textContent = 'Passed — well done'
+      sub.textContent = 'You’ve demonstrated a strong grasp of the material. Your digital asset pack is now available from your dashboard.'
+      document.getElementById('packBtn').classList.remove('hidden')
+    } else {
+      circle.style.background = '#f19082'
+      verdict.textContent = 'Not quite this time'
+      sub.textContent = `You need ${server.passMark} of ${server.total} (${server.passPercent}%) to pass. Review the answers below, revisit the modules if it helps, and retake when you’re ready.`
+      document.getElementById('retakeBtn').classList.remove('hidden')
+    }
+
+    document.getElementById('reviewList').innerHTML = QUESTIONS.map((Q, i) => {
+      const right = selected[i] === Q.a
+      return `<div class="flex gap-3 items-start border ${right ? 'border-green-200' : 'border-red-200'} rounded-lg px-4 py-3 text-sm bg-white">
+        <span class="flex-none w-5 h-5 rounded-full ${right ? 'bg-green-600' : 'bg-red-500'} text-white text-xs flex items-center justify-center mt-0.5">${right ? '✓' : '✗'}</span>
+        <div><span class="text-tmc-text">${i + 1}. ${esc(Q.q)}</span>
+        <div class="text-xs text-tmc-text/60 mt-1">Correct answer: ${letters[Q.a]}. ${esc(Q.opts[Q.a])}</div></div></div>`
+    }).join('')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  document.getElementById('retakeBtn').addEventListener('click', () => {
+    current = 0
+    answered = QUESTIONS.map(() => false)
+    selected = QUESTIONS.map(() => null)
+    document.getElementById('results').classList.add('hidden')
+    area.style.display = 'block'
+    document.getElementById('pbar').style.display = 'flex'
+    render()
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  })
+
+  render()
+</script>

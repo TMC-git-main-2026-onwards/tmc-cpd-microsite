@@ -27,13 +27,15 @@ const { data: modulesRaw } = await supabase
   .eq('published', true)
   .order('order_index')
 
-// Fetch this user's completions
+// Fetch this user's completions (quiz_score marks a passed final assessment)
 const { data: completionsRaw } = await supabase
   .from('module_completions')
-  .select('module_id')
+  .select('module_id, quiz_score')
   .eq('user_id', user.id)
 
 const completedIds = new Set((completionsRaw ?? []).map((c) => c.module_id))
+const PASS_PERCENT = 80
+const quizPassed = (completionsRaw ?? []).some((c) => (c.quiz_score ?? 0) >= PASS_PERCENT)
 
 // Build view models with sequential gating + signed video URLs.
 // A module unlocks once the previous one is complete (the first is always open).
@@ -180,6 +182,45 @@ const allComplete = total > 0 && completedCount === total
           <p class="text-xs text-tmc-text/50 mt-4">
             Watch each video to the end to mark the module complete and unlock the next one.
           </p>
+
+          <!-- Final assessment gate → asset pack -->
+          {allComplete && (
+            <div class="mt-8">
+              {quizPassed ? (
+                <div class="rounded-2xl border border-green-200 bg-green-50 p-6 sm:p-8">
+                  <div class="flex items-center gap-3 mb-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-7 h-7 text-green-600" role="img" aria-label="Passed">
+                      <path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.42l-7.5 7.5a1 1 0 01-1.42 0l-3.5-3.5a1 1 0 011.42-1.42l2.79 2.79 6.79-6.79a1 1 0 011.42 0z" clip-rule="evenodd" />
+                    </svg>
+                    <h2 class="text-xl font-light text-tmc-primary">CPD complete — assessment passed</h2>
+                  </div>
+                  <p class="text-sm text-tmc-text/80 mb-5">
+                    Congratulations. You've completed all five modules and passed the final assessment.
+                    Your digital asset pack is ready below.
+                  </p>
+                  <div class="flex flex-wrap gap-3">
+                    <a href="/asset-pack" class="inline-block bg-tmc-accent hover:bg-tmc-primary text-white text-sm font-medium px-6 py-2.5 rounded-lg transition-colors">
+                      Get your digital asset pack →
+                    </a>
+                    <a href="/quiz" class="inline-block bg-white border border-gray-300 hover:bg-tmc-light text-tmc-primary text-sm font-medium px-6 py-2.5 rounded-lg transition-colors">
+                      Review the assessment
+                    </a>
+                  </div>
+                </div>
+              ) : (
+                <div class="rounded-2xl border border-tmc-accent/40 bg-tmc-light p-6 sm:p-8">
+                  <h2 class="text-xl font-light text-tmc-primary mb-2">Final step: the assessment</h2>
+                  <p class="text-sm text-tmc-text/80 mb-5">
+                    You've watched all five modules — nicely done. Pass the {PASS_PERCENT}% assessment to
+                    unlock your digital asset pack (including your CPD certificate).
+                  </p>
+                  <a href="/quiz" class="inline-block bg-tmc-accent hover:bg-tmc-primary text-white text-sm font-medium px-6 py-2.5 rounded-lg transition-colors">
+                    Start the assessment →
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
 
@@ -251,6 +292,8 @@ const allComplete = total > 0 && completedCount === total
   // this are snapped back; rewinding is fine. Freely seekable once completed.
   let maxWatched = 0
   let allowSeek = false
+  let saveStarted = false        // one completion save per open
+  let wasCompletedOnOpen = false // don't re-save/reload on a rewatch
 
   const defaultStatus = 'Watch to the end to mark this module complete.'
 
@@ -259,6 +302,8 @@ const allComplete = total > 0 && completedCount === total
     completedThisOpen = false
     maxWatched = 0
     allowSeek = completed
+    saveStarted = false
+    wasCompletedOnOpen = completed
     retryBtn.classList.add('hidden')
     lastFocused = document.activeElement as HTMLElement
     titleEl.textContent = title
@@ -320,12 +365,20 @@ const allComplete = total > 0 && completedCount === total
     })
   })
 
-  // Advance the furthest-watched marker as the video plays normally.
+  // Advance the furthest-watched marker, and mark complete once the viewer is
+  // effectively at the end. Firing slightly before the true end (not only on the
+  // 'ended' event) means closing the tab a second early still counts — so nobody
+  // has to rewatch a whole video they finished. (Hollie's feedback.)
   video.addEventListener('timeupdate', () => {
-    if (!video.seeking && video.currentTime > maxWatched) {
-      maxWatched = video.currentTime
+    if (!video.seeking && video.currentTime > maxWatched) maxWatched = video.currentTime
+    const d = video.duration
+    if (!wasCompletedOnOpen && !saveStarted && d && isFinite(d) && video.currentTime >= d - 1.5) {
+      markComplete()
     }
   })
+
+  // 'ended' is a backstop in case timeupdate didn't reach the threshold.
+  video.addEventListener('ended', () => { if (!wasCompletedOnOpen) markComplete() })
 
   // Block seeking forward past what's been watched (first watch only).
   video.addEventListener('seeking', () => {
@@ -336,9 +389,9 @@ const allComplete = total > 0 && completedCount === total
     }
   })
 
-  // Mark complete when the video finishes.
-  video.addEventListener('ended', async () => {
-    if (!currentModuleId) return
+  async function markComplete() {
+    if (saveStarted || !currentModuleId) return
+    saveStarted = true
     pendingSaveModuleId = currentModuleId
     retryBtn.classList.add('hidden')
     statusEl.textContent = 'Saving your progress…'
@@ -347,27 +400,20 @@ const allComplete = total > 0 && completedCount === total
       pendingSaveModuleId = null
       completedThisOpen = true
       statusEl.textContent = '✓ Module complete — the next one is now unlocked.'
+      // Refresh once the video finishes so the tick + next unlock appear without
+      // a manual refresh. If it's still playing, closeModal() handles the reload.
+      if (video.ended || (video.duration && video.currentTime >= video.duration - 0.3)) {
+        setTimeout(() => window.location.reload(), 900)
+      }
     } else {
+      saveStarted = false // allow retry
       statusEl.textContent = 'We couldn’t save your progress.'
       retryBtn.classList.remove('hidden')
     }
-  })
+  }
 
   // Manual retry if the completion save failed.
-  retryBtn.addEventListener('click', async () => {
-    if (!pendingSaveModuleId) return
-    retryBtn.classList.add('hidden')
-    statusEl.textContent = 'Saving your progress…'
-    const ok = await saveCompletion(pendingSaveModuleId)
-    if (ok) {
-      pendingSaveModuleId = null
-      completedThisOpen = true
-      statusEl.textContent = '✓ Module complete — the next one is now unlocked.'
-    } else {
-      statusEl.textContent = 'Still couldn’t save. Check your connection and try again.'
-      retryBtn.classList.remove('hidden')
-    }
-  })
+  retryBtn.addEventListener('click', () => { if (pendingSaveModuleId) markComplete() })
 
   // Last-ditch save if the user closes the tab/navigates before the save landed.
   window.addEventListener('pagehide', () => {
