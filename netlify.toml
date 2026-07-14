@@ -40,6 +40,15 @@
   [headers.values]
     Cache-Control = "private, no-store"
 
+# Canonical domain: send the raw netlify.app address to themolecliniccpd.co.uk so
+# visitors only ever see the real domain. Deploy-preview subdomains are a
+# different host, so they're unaffected. :splat preserves the path.
+[[redirects]]
+  from = "https://tmc-cpd-microsite.netlify.app/*"
+  to = "https://themolecliniccpd.co.uk/:splat"
+  status = 301
+  force = true
+
 # Privacy policy lives on the main site — redirect the microsite's /privacy there.
 # force = true so it applies even to bookmarks/SEO hits. 302 keeps it reversible.
 [[redirects]]

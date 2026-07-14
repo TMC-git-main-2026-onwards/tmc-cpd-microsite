@@ -46,5 +46,17 @@ const ogImage = 'https://cpd.themoleclinic.co.uk/og-image.png'; // TODO: add OG 
       <slot />
     </main>
     <Footer />
+    <script is:inline>
+      // Tidy the address bar: strip leftover auth params (e.g. ?code=…) after
+      // sign-in so users see a clean URL. These are already consumed server-side.
+      (function () {
+        var u = new URL(window.location.href);
+        var keys = ['code', 'error', 'error_description', 'error_code'];
+        if (keys.some(function (k) { return u.searchParams.has(k); })) {
+          keys.forEach(function (k) { u.searchParams.delete(k); });
+          window.history.replaceState({}, '', u.pathname + u.search + u.hash);
+        }
+      })();
+    </script>
   </body>
 </html>
