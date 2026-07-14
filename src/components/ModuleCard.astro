@@ -1,7 +1,9 @@
 ---
 interface Segment {
   description: string;
-  duration: string;
+  duration?: string;
+  href?: string;
+  linkText?: string;
 }
 
 interface Props {
@@ -44,8 +46,25 @@ const { number, title, subtitle, accentBg, accentText, dotColor, segments, learn
           class="w-1.5 h-1.5 rounded-full flex-shrink-0"
           style={`background: ${dotColor};`}
         />
-        <span class="text-sm text-tmc-text/80 flex-1">{seg.description}</span>
-        <span class="text-xs text-tmc-text/50 whitespace-nowrap">{seg.duration}</span>
+        <span class="text-sm text-tmc-text/80 flex-1">
+          {seg.description}
+          {seg.href && (
+            <>
+              {' — '}
+              <a
+                href={seg.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-tmc-accent hover:text-tmc-primary underline underline-offset-2"
+              >
+                {seg.linkText ?? 'Find your nearest clinic'}
+              </a>
+            </>
+          )}
+        </span>
+        {seg.duration && (
+          <span class="text-xs text-tmc-text/50 whitespace-nowrap">{seg.duration}</span>
+        )}
       </li>
     ))}
   </ul>
