@@ -22,10 +22,18 @@ const passRow = (comps ?? []).find((c) => (c.quiz_score ?? 0) >= PASS_PERCENT)
 if (!allComplete || !passRow) return Astro.redirect('/quiz')
 
 const displayName = profile?.full_name || profile?.email || user.email
+const fullName = profile?.full_name || ''
 const score = passRow.quiz_score
-const completedDate = new Date(passRow.completed_at ?? Date.now()).toLocaleDateString('en-GB', {
+const completedAt = new Date(passRow.completed_at ?? Date.now())
+const completedDate = completedAt.toLocaleDateString('en-GB', {
   day: 'numeric', month: 'long', year: 'numeric',
 })
+// DD/MM/YYYY to match the certificate template's date style.
+const certDate = [
+  String(completedAt.getDate()).padStart(2, '0'),
+  String(completedAt.getMonth() + 1).padStart(2, '0'),
+  completedAt.getFullYear(),
+].join('/')
 ---
 <Layout title="Your CPD asset pack" description="Your Mole Clinic Skin Cancer CPD completion assets.">
   <section class="bg-tmc-primary text-white">
@@ -67,17 +75,64 @@ const completedDate = new Date(passRow.completed_at ?? Date.now()).toLocaleDateS
         </p>
       </div>
 
-      <!-- Asset list -->
-      <div class="grid sm:grid-cols-2 gap-4 no-print">
-        <div class="bg-tmc-surface rounded-2xl p-6">
-          <h3 class="text-base font-medium text-tmc-primary mb-1">CPD Certificate</h3>
-          <p class="text-sm text-tmc-text/70">Your formal certificate is being finalised — we'll email it to <b>{profile?.email || user.email}</b> shortly.</p>
-          <span class="inline-block mt-3 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">Coming soon</span>
+      <!-- CPD Certificate generator -->
+      <div class="bg-tmc-surface rounded-2xl p-6 sm:p-8 mb-6 no-print">
+        <h3 class="text-base font-medium text-tmc-primary mb-1">CPD Certificate</h3>
+        <p class="text-sm text-tmc-text/70 mb-5">
+          Add your details, preview your personalised certificate, then download it as a high-resolution PNG.
+          Your business or clinic name is optional.
+        </p>
+
+        <form id="certForm" class="grid sm:grid-cols-2 gap-4 mb-5">
+          <label class="block">
+            <span class="block text-xs font-medium text-tmc-text/70 mb-1">Your name (as it should appear)</span>
+            <input id="certName" type="text" value={fullName} placeholder="e.g. Dr Jane Smith"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-tmc-text focus:border-tmc-accent focus:outline-none focus:ring-1 focus:ring-tmc-accent" />
+          </label>
+          <label class="block">
+            <span class="block text-xs font-medium text-tmc-text/70 mb-1">Business / clinic name <span class="text-tmc-text/40">(optional)</span></span>
+            <input id="certBusiness" type="text" placeholder="e.g. Riverside Physiotherapy"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-tmc-text focus:border-tmc-accent focus:outline-none focus:ring-1 focus:ring-tmc-accent" />
+          </label>
+          <div class="sm:col-span-2 flex flex-wrap items-center gap-3">
+            <button id="genCert" type="submit"
+              class="bg-tmc-accent hover:bg-tmc-primary text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors">
+              Generate preview
+            </button>
+            <a id="downloadCert" href="#" download
+              class="hidden bg-tmc-primary hover:bg-tmc-text text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors">
+              Download certificate (PNG)
+            </a>
+            <span id="certError" class="hidden text-sm text-red-600"></span>
+          </div>
+        </form>
+
+        <div id="certPreviewWrap" class="hidden">
+          <p class="text-xs text-tmc-text/50 mb-2">Preview</p>
+          <img id="certPreview" alt="Your CPD certificate preview"
+            class="w-full max-w-xl rounded-lg border border-gray-200 shadow-sm" />
         </div>
-        <div class="bg-tmc-surface rounded-2xl p-6">
-          <h3 class="text-base font-medium text-tmc-primary mb-1">Digital badge</h3>
-          <p class="text-sm text-tmc-text/70">A shareable badge for your profile and email signature — arriving with your certificate.</p>
-          <span class="inline-block mt-3 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-full">Coming soon</span>
+
+        <!-- Off-screen full-resolution render target (2000×1414). -->
+        <canvas id="certCanvas" width="2000" height="1414" class="hidden"
+          data-template="/certificate-template.png" data-date={certDate}></canvas>
+      </div>
+
+      <!-- Digital badge -->
+      <div class="bg-tmc-surface rounded-2xl p-6 no-print">
+        <div class="flex items-center gap-5">
+          <img src="/cpd-badge.png" alt="Skin Cancer Awareness Trained — Physiotherapists 2026 badge"
+            width="88" height="118" class="flex-shrink-0" />
+          <div>
+            <h3 class="text-base font-medium text-tmc-primary mb-1">Digital badge</h3>
+            <p class="text-sm text-tmc-text/70 mb-3">
+              A shareable badge for your website, profile or email signature.
+            </p>
+            <a href="/cpd-badge.png" download="TMC-Skin-Cancer-CPD-Badge.png"
+              class="inline-block bg-tmc-primary hover:bg-tmc-text text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors">
+              Download badge (PNG)
+            </a>
+          </div>
         </div>
       </div>
 
@@ -98,4 +153,128 @@ const completedDate = new Date(passRow.completed_at ?? Date.now()).toLocaleDateS
 
 <script>
   document.getElementById('printBtn')?.addEventListener('click', () => window.print())
+
+  // ---- CPD certificate generator ------------------------------------------
+  // Composites the user's name, business and completion date onto the branded
+  // template (2000×1414). Coordinates were calibrated against the template's
+  // placeholder bands. Generating only builds a preview; the separate Download
+  // button is the only thing that writes a file to the user's machine.
+  const canvas = document.getElementById('certCanvas') as HTMLCanvasElement | null
+  const form = document.getElementById('certForm') as HTMLFormElement | null
+
+  if (canvas && form) {
+    const nameInput = document.getElementById('certName') as HTMLInputElement
+    const bizInput = document.getElementById('certBusiness') as HTMLInputElement
+    const previewWrap = document.getElementById('certPreviewWrap') as HTMLElement
+    const previewImg = document.getElementById('certPreview') as HTMLImageElement
+    const downloadLink = document.getElementById('downloadCert') as HTMLAnchorElement
+    const errorEl = document.getElementById('certError') as HTMLElement
+    const certDate = canvas.dataset.date || ''
+    const templateSrc = canvas.dataset.template || '/certificate-template.png'
+
+    const PRIMARY = '#006F96'
+    const GREY = '#395171'
+
+    let templatePromise: Promise<HTMLImageElement> | null = null
+    function loadTemplate() {
+      if (!templatePromise) {
+        templatePromise = new Promise((resolve, reject) => {
+          const img = new Image()
+          img.onload = () => resolve(img)
+          img.onerror = () => reject(new Error('template failed to load'))
+          img.src = templateSrc
+        })
+      }
+      return templatePromise
+    }
+
+    // Shrink the font until the text fits within maxWidth.
+    function fitFont(ctx: CanvasRenderingContext2D, text: string, weight: string, basePx: number, maxWidth: number) {
+      let px = basePx
+      ctx.font = `${weight} ${px}px Inter, sans-serif`
+      const w = ctx.measureText(text).width
+      if (w > maxWidth) {
+        px = Math.floor(px * (maxWidth / w))
+        ctx.font = `${weight} ${px}px Inter, sans-serif`
+      }
+    }
+
+    async function render(name: string, business: string) {
+      const img = await loadTemplate()
+      // Make sure Inter is ready so the first render isn't drawn in a fallback face.
+      try {
+        await Promise.all([
+          (document as any).fonts.load('bold 72px Inter'),
+          (document as any).fonts.load('bold 54px Inter'),
+          (document as any).fonts.load('400 30px Inter'),
+        ])
+        await (document as any).fonts.ready
+      } catch { /* fall back to system sans if the Fonts API is unavailable */ }
+
+      const ctx = canvas!.getContext('2d')!
+      ctx.clearRect(0, 0, canvas!.width, canvas!.height)
+      ctx.drawImage(img, 0, 0, canvas!.width, canvas!.height)
+
+      // Cover the template's placeholder text with the (white) background.
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(360, 500, 1280, 112)   // name band
+      ctx.fillRect(360, 652, 1280, 98)    // business band
+      ctx.fillRect(998, 1012, 254, 88)    // date
+
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillStyle = PRIMARY
+      fitFont(ctx, name, 'bold', 72, 1240)
+      ctx.fillText(name, 1000, 556)
+
+      if (business) {
+        fitFont(ctx, business, 'bold', 54, 1280)
+        ctx.fillText(business, 1000, 701)
+      }
+
+      ctx.textAlign = 'left'
+      ctx.fillStyle = GREY
+      ctx.font = '400 30px Inter, sans-serif'
+      ctx.fillText(certDate, 1010, 1053)
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      errorEl.classList.add('hidden')
+      const name = nameInput.value.trim()
+      const business = bizInput.value.trim()
+      if (!name) {
+        errorEl.textContent = 'Please enter your name.'
+        errorEl.classList.remove('hidden')
+        nameInput.focus()
+        return
+      }
+      try {
+        await render(name, business)
+        previewImg.src = canvas!.toDataURL('image/png')
+        previewWrap.classList.remove('hidden')
+
+        const safe = name.replace(/[^a-z0-9]+/gi, '-').replace(/^-+|-+$/g, '') || 'certificate'
+        downloadLink.textContent = 'Download certificate (PNG)'
+        downloadLink.classList.remove('hidden')
+        downloadLink.onclick = (ev) => {
+          ev.preventDefault()
+          canvas!.toBlob((blob) => {
+            if (!blob) return
+            const url = URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `TMC-CPD-Certificate-${safe}.png`
+            document.body.appendChild(a)
+            a.click()
+            a.remove()
+            URL.revokeObjectURL(url)
+          }, 'image/png')
+        }
+      } catch {
+        errorEl.textContent = 'Sorry, the certificate could not be generated. Please try again.'
+        errorEl.classList.remove('hidden')
+      }
+    })
+  }
 </script>
