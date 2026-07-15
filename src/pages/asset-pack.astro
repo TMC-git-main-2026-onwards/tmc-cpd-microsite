@@ -28,12 +28,6 @@ const completedAt = new Date(passRow.completed_at ?? Date.now())
 const completedDate = completedAt.toLocaleDateString('en-GB', {
   day: 'numeric', month: 'long', year: 'numeric',
 })
-// DD/MM/YYYY to match the certificate template's date style.
-const certDate = [
-  String(completedAt.getDate()).padStart(2, '0'),
-  String(completedAt.getMonth() + 1).padStart(2, '0'),
-  completedAt.getFullYear(),
-].join('/')
 ---
 <Layout title="Your CPD asset pack" description="Your Mole Clinic Skin Cancer CPD completion assets.">
   <section class="bg-tmc-primary text-white">
@@ -115,7 +109,7 @@ const certDate = [
 
         <!-- Off-screen full-resolution render target (2000×1414). -->
         <canvas id="certCanvas" width="2000" height="1414" class="hidden"
-          data-template="/certificate-template.png" data-date={certDate}></canvas>
+          data-template="/certificate-template.png"></canvas>
       </div>
 
       <!-- Digital badge -->
@@ -239,7 +233,10 @@ const certDate = [
     const previewImg = document.getElementById('certPreview') as HTMLImageElement
     const downloadLink = document.getElementById('downloadCert') as HTMLAnchorElement
     const errorEl = document.getElementById('certError') as HTMLElement
-    const certDate = canvas.dataset.date || ''
+    // Always stamp the certificate with the date it is generated ("today"),
+    // formatted DD/MM/YYYY to match the template.
+    const today = new Date()
+    const certDate = `${String(today.getDate()).padStart(2, '0')}/${String(today.getMonth() + 1).padStart(2, '0')}/${today.getFullYear()}`
     const templateSrc = canvas.dataset.template || '/certificate-template.png'
 
     const PRIMARY = '#006F96'
