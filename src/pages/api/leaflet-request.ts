@@ -26,7 +26,11 @@ function json(status: number, obj: unknown): Response {
 }
 
 export const POST: APIRoute = async ({ request, cookies }) => {
-  const resendApiKey = import.meta.env.RESEND_API_KEY
+  // Prefer the build-inlined value; fall back to the runtime process env, which
+  // is how Netlify injects function env vars at request time.
+  const resendApiKey =
+    import.meta.env.RESEND_API_KEY ||
+    (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.RESEND_API_KEY
   if (!resendApiKey) {
     console.error('leaflet-request: missing RESEND_API_KEY')
     return json(500, { error: 'Leaflet requests are not configured. Please email us instead.' })
