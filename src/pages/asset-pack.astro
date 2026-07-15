@@ -136,10 +136,64 @@ const certDate = [
         </div>
       </div>
 
-      <!-- Contact details -->
+      <!-- Request leaflets -->
       <div class="mt-6 bg-tmc-surface rounded-2xl p-6 no-print">
-        <h3 class="text-base font-medium text-tmc-primary mb-1">Questions, or want to request leaflets?</h3>
-        <p class="text-sm text-tmc-text/70 mb-3">Get in touch with the team at The Mole Clinic:</p>
+        <h3 class="text-base font-medium text-tmc-primary mb-1">Receive The Mole Clinic leaflets to give to your patients</h3>
+        <p class="text-sm text-tmc-text/70 mb-4">
+          Request a supply of printed leaflets to hand to your patients. Fill in your details below and we'll post them out to you.
+        </p>
+
+        <form id="leafletForm" class="grid sm:grid-cols-2 gap-4">
+          <label class="block">
+            <span class="block text-xs font-medium text-tmc-text/70 mb-1">Your name</span>
+            <input id="lfName" name="name" type="text" required value={fullName} placeholder="e.g. Dr Jane Smith"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-tmc-text focus:border-tmc-accent focus:outline-none focus:ring-1 focus:ring-tmc-accent" />
+          </label>
+          <label class="block">
+            <span class="block text-xs font-medium text-tmc-text/70 mb-1">Email</span>
+            <input id="lfEmail" name="email" type="email" required value={profile?.email || user.email || ''} placeholder="you@clinic.co.uk"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-tmc-text focus:border-tmc-accent focus:outline-none focus:ring-1 focus:ring-tmc-accent" />
+          </label>
+          <label class="block">
+            <span class="block text-xs font-medium text-tmc-text/70 mb-1">Business / clinic name <span class="text-tmc-text/40">(optional)</span></span>
+            <input id="lfBusiness" name="business" type="text" placeholder="e.g. Riverside Physiotherapy"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-tmc-text focus:border-tmc-accent focus:outline-none focus:ring-1 focus:ring-tmc-accent" />
+          </label>
+          <label class="block">
+            <span class="block text-xs font-medium text-tmc-text/70 mb-1">Phone <span class="text-tmc-text/40">(optional)</span></span>
+            <input id="lfPhone" name="phone" type="tel" placeholder="For delivery queries"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-tmc-text focus:border-tmc-accent focus:outline-none focus:ring-1 focus:ring-tmc-accent" />
+          </label>
+          <label class="block sm:col-span-2">
+            <span class="block text-xs font-medium text-tmc-text/70 mb-1">Postal address (where should we send them?)</span>
+            <textarea id="lfAddress" name="address" required rows="3" placeholder="Clinic name, street, town, postcode"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-tmc-text focus:border-tmc-accent focus:outline-none focus:ring-1 focus:ring-tmc-accent"></textarea>
+          </label>
+          <label class="block">
+            <span class="block text-xs font-medium text-tmc-text/70 mb-1">Number of leaflets <span class="text-tmc-text/40">(optional)</span></span>
+            <select id="lfQuantity" name="quantity"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-tmc-text bg-white focus:border-tmc-accent focus:outline-none focus:ring-1 focus:ring-tmc-accent">
+              <option value="">Select…</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="More than 100">More than 100</option>
+            </select>
+          </label>
+          <div class="sm:col-span-2 flex flex-wrap items-center gap-3">
+            <button id="lfSubmit" type="submit"
+              class="bg-tmc-accent hover:bg-tmc-primary text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors disabled:opacity-60 disabled:cursor-not-allowed">
+              Request leaflets
+            </button>
+            <span id="leafletMsg" class="hidden text-sm"></span>
+          </div>
+        </form>
+      </div>
+
+      <!-- Get in touch -->
+      <div class="mt-6 bg-tmc-surface rounded-2xl p-6 no-print">
+        <h3 class="text-base font-medium text-tmc-primary mb-1">Get in touch</h3>
+        <p class="text-sm text-tmc-text/70 mb-3">Any questions? The team at The Mole Clinic is happy to help:</p>
         <ul class="text-sm text-tmc-text/80 space-y-1.5 list-none p-0 m-0">
           <li>
             <a href="https://themoleclinic.co.uk/" target="_blank" rel="noopener noreferrer"
@@ -290,6 +344,62 @@ const certDate = [
       } catch {
         errorEl.textContent = 'Sorry, the certificate could not be generated. Please try again.'
         errorEl.classList.remove('hidden')
+      }
+    })
+  }
+
+  // ---- Leaflet request ----------------------------------------------------
+  // Posts the form to /api/leaflet-request, which emails the marketing team.
+  const leafletForm = document.getElementById('leafletForm') as HTMLFormElement | null
+  const leafletMsg = document.getElementById('leafletMsg') as HTMLElement | null
+  const leafletSubmit = document.getElementById('lfSubmit') as HTMLButtonElement | null
+
+  if (leafletForm && leafletMsg && leafletSubmit) {
+    const showMsg = (text: string, ok: boolean) => {
+      leafletMsg.textContent = text
+      leafletMsg.className = `text-sm ${ok ? 'text-green-700' : 'text-red-600'}`
+    }
+
+    leafletForm.addEventListener('submit', async (e) => {
+      e.preventDefault()
+      const payload = {
+        name: (document.getElementById('lfName') as HTMLInputElement).value,
+        email: (document.getElementById('lfEmail') as HTMLInputElement).value,
+        business: (document.getElementById('lfBusiness') as HTMLInputElement).value,
+        phone: (document.getElementById('lfPhone') as HTMLInputElement).value,
+        address: (document.getElementById('lfAddress') as HTMLTextAreaElement).value,
+        quantity: (document.getElementById('lfQuantity') as HTMLSelectElement).value,
+      }
+      if (!payload.name.trim() || !payload.address.trim()) {
+        showMsg('Please enter your name and postal address.', false)
+        return
+      }
+
+      leafletSubmit.disabled = true
+      const original = leafletSubmit.textContent
+      leafletSubmit.textContent = 'Sending…'
+      showMsg('', true)
+
+      try {
+        const res = await fetch('/api/leaflet-request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (res.ok) {
+          leafletForm.reset()
+          showMsg("Thank you — your leaflet request has been sent. We'll be in touch.", true)
+          leafletSubmit.textContent = 'Request sent ✓'
+        } else {
+          showMsg(data.error || 'Sorry, something went wrong. Please try again.', false)
+          leafletSubmit.disabled = false
+          leafletSubmit.textContent = original
+        }
+      } catch {
+        showMsg('Sorry, something went wrong. Please try again.', false)
+        leafletSubmit.disabled = false
+        leafletSubmit.textContent = original
       }
     })
   }
