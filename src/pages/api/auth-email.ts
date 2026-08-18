@@ -123,8 +123,13 @@ function buildEmail(data: EmailData, recipientNote = '') {
 }
 
 export const POST: APIRoute = async ({ request }) => {
-  const hookSecret = import.meta.env.SEND_EMAIL_HOOK_SECRET
-  const resendApiKey = import.meta.env.RESEND_API_KEY
+  // Prefer the build-inlined value; fall back to the runtime process env, which
+  // is how Netlify injects function env vars at request time (same pattern as
+  // leaflet-request.ts — import.meta.env misses vars added after the build).
+  const runtimeEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } })
+    .process?.env
+  const hookSecret = import.meta.env.SEND_EMAIL_HOOK_SECRET || runtimeEnv?.SEND_EMAIL_HOOK_SECRET
+  const resendApiKey = import.meta.env.RESEND_API_KEY || runtimeEnv?.RESEND_API_KEY
   if (!hookSecret || !resendApiKey) {
     console.error('auth-email hook: missing SEND_EMAIL_HOOK_SECRET or RESEND_API_KEY')
     return errorResponse(500, 'Email hook is not configured')
