@@ -9,7 +9,7 @@ const supabase = getServerClient(Astro.request, Astro.cookies)
 const { data: { user }, error: userError } = await supabase.auth.getUser()
 
 if (!user || userError) {
-  return Astro.redirect('/login')
+  return Astro.redirect('/admin/login')
 }
 
 // Only emails on the allowlist can see this page. Everyone else — including

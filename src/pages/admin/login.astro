@@ -1,0 +1,105 @@
+---
+export const prerender = false
+
+import Layout from '../../layouts/Layout.astro'
+
+// Already signed in — send straight to the signups page (it will bounce
+// non-admins on to /dashboard).
+if (Astro.locals.session) {
+  return Astro.redirect('/admin/signups')
+}
+
+const errorMsg = new URL(Astro.request.url).searchParams.get('error')
+---
+<Layout title="Admin sign in" description="Admin sign in for the TMC CPD microsite.">
+  <section class="bg-tmc-primary text-white">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-14">
+      <h1 class="text-3xl sm:text-4xl font-light text-white mb-2">Admin sign in</h1>
+      <p class="text-tmc-light font-light">Staff access only.</p>
+    </div>
+  </section>
+
+  <section class="py-16">
+    <div class="max-w-md mx-auto px-4 sm:px-6">
+
+      {errorMsg && (
+        <div class="mb-6 bg-red-50 border border-red-200 text-red-700 text-sm px-4 py-3 rounded-lg">
+          Something went wrong. Please try again.
+        </div>
+      )}
+
+      <form id="admin-login-form" class="flex flex-col gap-4">
+        <div class="flex flex-col gap-1">
+          <label for="admin-email" class="text-sm font-medium text-tmc-text">Email</label>
+          <input
+            id="admin-email"
+            type="email"
+            name="email"
+            required
+            placeholder="you@themoleclinic.co.uk"
+            class="border border-tmc-mid rounded-lg px-4 py-2.5 text-sm text-tmc-text focus:outline-none focus:ring-2 focus:ring-tmc-accent"
+          />
+        </div>
+        <div class="flex flex-col gap-1">
+          <label for="admin-password" class="text-sm font-medium text-tmc-text">Password</label>
+          <input
+            id="admin-password"
+            type="password"
+            name="password"
+            required
+            class="border border-tmc-mid rounded-lg px-4 py-2.5 text-sm text-tmc-text focus:outline-none focus:ring-2 focus:ring-tmc-accent"
+          />
+        </div>
+        <p id="admin-error" class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></p>
+        <button
+          type="submit"
+          id="admin-submit"
+          class="w-full bg-tmc-accent hover:bg-tmc-primary text-white font-medium py-3 rounded-lg transition-colors text-sm disabled:opacity-60"
+        >
+          Sign in
+        </button>
+      </form>
+
+      <p class="mt-6 text-center text-sm text-tmc-text/70">
+        Not staff?
+        <a href="/login" class="text-tmc-accent hover:text-tmc-primary underline underline-offset-2 ml-1">
+          Go to the learner sign-in
+        </a>
+      </p>
+    </div>
+  </section>
+</Layout>
+
+<script>
+  import { getBrowserClient } from '../../lib/supabase'
+  import { friendlyAuthError } from '../../lib/auth-errors'
+
+  const supabase = getBrowserClient()
+
+  const form = document.getElementById('admin-login-form') as HTMLFormElement
+  const errorEl = document.getElementById('admin-error') as HTMLElement
+  const submitBtn = document.getElementById('admin-submit') as HTMLButtonElement
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault()
+    errorEl.classList.add('hidden')
+    submitBtn.disabled = true
+    submitBtn.textContent = 'Signing in…'
+
+    const email = (document.getElementById('admin-email') as HTMLInputElement).value.trim()
+    const password = (document.getElementById('admin-password') as HTMLInputElement).value
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+
+    submitBtn.disabled = false
+    submitBtn.textContent = 'Sign in'
+
+    if (error) {
+      errorEl.textContent = friendlyAuthError(error)
+      errorEl.classList.remove('hidden')
+      return
+    }
+
+    window.location.href = '/admin/signups'
+  })
+</script>
