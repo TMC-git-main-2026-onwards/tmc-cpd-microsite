@@ -1,0 +1,75 @@
+---
+export const prerender = false
+
+import Layout from '../../layouts/Layout.astro'
+import { getServerClient, getAdminClient } from '../../lib/supabase'
+
+// Re-validate the session server-side (not just a cookie read).
+const supabase = getServerClient(Astro.request, Astro.cookies)
+const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+if (!user || userError) {
+  return Astro.redirect('/login')
+}
+
+// Only emails on the allowlist can see this page. Everyone else — including
+// ordinary CPD learners — gets bounced to their own dashboard.
+const adminEmails = (import.meta.env.ADMIN_EMAILS ?? '')
+  .split(',')
+  .map((e: string) => e.trim().toLowerCase())
+  .filter(Boolean)
+
+if (!user.email || !adminEmails.includes(user.email.toLowerCase())) {
+  return Astro.redirect('/dashboard')
+}
+
+// Service-role client to read every profile regardless of RLS.
+const admin = getAdminClient()
+const { data: profiles } = await admin
+  .from('profiles')
+  .select('created_at, email, full_name, profession, workplace, marketing_consent')
+  .order('created_at', { ascending: false })
+
+const signups = profiles ?? []
+---
+<Layout title="Signups" description="CPD signups (admin only).">
+  <section class="bg-tmc-primary text-white">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 py-10">
+      <h1 class="text-2xl sm:text-3xl font-light text-white">CPD signups</h1>
+      <p class="text-tmc-light/80 text-sm mt-1">{signups.length} total</p>
+    </div>
+  </section>
+
+  <section class="py-10">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6">
+      <div class="overflow-x-auto border border-gray-100 rounded-xl">
+        <table class="w-full text-sm border-collapse">
+          <thead>
+            <tr class="bg-tmc-surface text-left">
+              <th class="px-4 py-2 font-medium text-tmc-text/70">Signed up</th>
+              <th class="px-4 py-2 font-medium text-tmc-text/70">Email</th>
+              <th class="px-4 py-2 font-medium text-tmc-text/70">Name</th>
+              <th class="px-4 py-2 font-medium text-tmc-text/70">Profession</th>
+              <th class="px-4 py-2 font-medium text-tmc-text/70">Workplace</th>
+              <th class="px-4 py-2 font-medium text-tmc-text/70">Marketing</th>
+            </tr>
+          </thead>
+          <tbody>
+            {signups.map((s) => (
+              <tr class="border-t border-gray-100">
+                <td class="px-4 py-2 whitespace-nowrap text-tmc-text/70">
+                  {new Date(s.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                </td>
+                <td class="px-4 py-2">{s.email}</td>
+                <td class="px-4 py-2">{s.full_name || '—'}</td>
+                <td class="px-4 py-2">{s.profession || '—'}</td>
+                <td class="px-4 py-2">{s.workplace || '—'}</td>
+                <td class="px-4 py-2">{s.marketing_consent ? 'Yes' : 'No'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+</Layout>
